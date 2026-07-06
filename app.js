@@ -166,8 +166,17 @@ function init() {
     state.houseParts = JSON.parse(storedHouseParts);
   } else {
     state.houseParts = [...DEFAULT_HOUSE_PARTS];
-    localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
   }
+  // Migrate zones saved before minPeople/priority existed, so old browser
+  // data doesn't silently break assignment (a missing minPeople stops the
+  // assignment loop from ever running).
+  state.houseParts = state.houseParts.map(zone => ({
+    id: zone.id,
+    name: zone.name,
+    minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
+    priority: (typeof zone.priority === "number") ? zone.priority : 999
+  }));
+  localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
 
   // Load Calendar
   const storedCalendar = localStorage.getItem(STORAGE_CALENDAR);
@@ -1190,8 +1199,9 @@ function generateCalendar() {
 
   zones.forEach(zone => {
     const assignedCadets = [];
+    const minP = (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1;
 
-    for (let i = 0; i < zone.minPeople; i++) {
+    for (let i = 0; i < minP; i++) {
       const candidates = zonePrimaryPool.filter(c => !assignedCadets.includes(c));
       if (candidates.length === 0) break;
 
@@ -1222,15 +1232,36 @@ function generateCalendar() {
   }
 
   // 4. EVENING CHECK (CONTROLLO SERALE)
-  // Assign one person per day from Thursday to Wednesday.
-  DAYS_OF_WEEK.forEach(day => {
+  // Assign one person per day from Thursday to Wednesday. Track the day each
+  // person last did the evening check so the same person can't be picked on
+  // consecutive days (the previous version only nudged loadCounts by 0.5,
+  // too small to stop someone with an otherwise-low load from being reused
+  // for several days in a row).
+  const eveningLastAssignedDayIndex = {};
+  activeCadets.forEach(c => { eveningLastAssignedDayIndex[c.id] = -Infinity; });
+  const eveningLoadCounts = {};
+  activeCadets.forEach(c => { eveningLoadCounts[c.id] = 0; });
+  const MIN_EVENING_GAP = 2; // must skip at least one day before repeating
+
+  DAYS_OF_WEEK.forEach((day, dayIndex) => {
     const dailyRoster = getPresentCadetsForDay(day);
-    if (dailyRoster.length > 0) {
-      dailyRoster.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
-      const selected = dailyRoster[0];
-      newCalendar.eveningCheck[day] = selected.name;
-      loadCounts[selected.id] += 0.5; // Small weight
+    if (dailyRoster.length === 0) return;
+
+    let candidates = dailyRoster.filter(c => (dayIndex - eveningLastAssignedDayIndex[c.id]) >= MIN_EVENING_GAP);
+    if (candidates.length === 0) {
+      // Fallback: too few people present to enforce the gap; pick whoever
+      // went longest without doing the evening check.
+      dailyRoster.sort((a, b) => eveningLastAssignedDayIndex[a.id] - eveningLastAssignedDayIndex[b.id]);
+      candidates = [dailyRoster[0]];
     }
+
+    candidates.sort((a, b) => eveningLoadCounts[a.id] - eveningLoadCounts[b.id]);
+    const selected = candidates[0];
+
+    newCalendar.eveningCheck[day] = selected.name;
+    eveningLoadCounts[selected.id]++;
+    loadCounts[selected.id] += 1;
+    eveningLastAssignedDayIndex[selected.id] = dayIndex;
   });
 
   // 5. LAUNDRY TABLE (LAVANDERIA)

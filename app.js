@@ -1193,9 +1193,17 @@ function generateCalendar() {
   // Sort zones by priority, like tasks.
   const zones = [...state.houseParts].sort((a, b) => a.priority - b.priority);
 
-  // Pool of candidates eligible to be primary assignees: fully present cadets only.
-  // If nobody is fully present this week, fall back to all active cadets (degenerate case).
-  const zonePrimaryPool = fullyPresentCadets.length > 0 ? fullyPresentCadets : activeCadets;
+  // Pool of candidates eligible to be primary assignees: fully present cadets only,
+  // excluding whoever already got the meter reading duty (they shouldn't also be
+  // stuck cleaning a zone). If nobody is fully present this week, fall back to all
+  // active cadets (degenerate case).
+  const zonePrimaryPoolBase = fullyPresentCadets.length > 0 ? fullyPresentCadets : activeCadets;
+  let zonePrimaryPool = zonePrimaryPoolBase.filter(c => !meterCandidate || c.id !== meterCandidate.id);
+  if (zonePrimaryPool.length === 0) {
+    // Excluding the meter reader would leave nobody eligible (very small/absent-heavy
+    // roster): better to double them up than leave zones completely unassigned.
+    zonePrimaryPool = zonePrimaryPoolBase;
+  }
 
   zones.forEach(zone => {
     const assignedCadets = [];

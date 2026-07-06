@@ -550,7 +550,7 @@ function deletePerson(id) {
 
 function populatePeopleTable() {
   peopleTableBody.innerHTML = "";
-  state.people.forEach(p => {
+  getSchedulablePeople().forEach(p => {
     const tr = document.createElement("tr");
 
     const editBtn = state.currentUser.role === "admin"

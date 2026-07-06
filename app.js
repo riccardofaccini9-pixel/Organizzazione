@@ -662,6 +662,14 @@ function populateHousePartsTable() {
   });
 }
 
+// The default ADMIN account is a management login, not a resident: it should
+// never show up as an assignable/schedulable person anywhere (wizard,
+// calendar assignee dropdowns, chore rotation). Other admin accounts created
+// via Gestione Persone still take part normally.
+function getSchedulablePeople() {
+  return state.people.filter(p => p.id !== "admin-default");
+}
+
 // CALENDAR RENDER & DIRECT EDITING SYSTEM
 function createBlankCalendar() {
   const cal = {
@@ -774,7 +782,7 @@ function renderCalendar() {
     meterAssigneeText.style.display = "none";
     let selectHTML = `<select id="edit-meter-assignee" class="meter-select">
       <option value="">Nessuno</option>
-      ${state.people.map(p => `<option value="${escapeHtml(p.name)}" ${state.calendar.meterAssignee === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+      ${getSchedulablePeople().map(p => `<option value="${escapeHtml(p.name)}" ${state.calendar.meterAssignee === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
     </select>`;
     document.getElementById("meter-display-container").innerHTML = selectHTML;
   } else {
@@ -856,7 +864,7 @@ function renderCalendar() {
     if (state.isUnlocked) {
       assigneeHTML = `<select id="edit-evening-${day}" class="input-field" style="padding: 6px 10px; font-size: 13px; margin-top: 4px;">
         <option value="">Nessuno</option>
-        ${state.people.map(p => `<option value="${escapeHtml(p.name)}" ${assignee === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+        ${getSchedulablePeople().map(p => `<option value="${escapeHtml(p.name)}" ${assignee === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
       </select>`;
     } else {
       assigneeHTML = `<div class="evening-day-assignee">${escapeHtml(assignee) || '-'}</div>`;
@@ -880,12 +888,12 @@ function renderCalendar() {
     if (state.isUnlocked) {
       tdM.innerHTML = `<select id="edit-laundry-mattina-${day}" class="input-field" style="padding: 6px; font-size: 12px; width: 100%;">
         <option value="">-</option>
-        ${state.people.map(p => `<option value="${escapeHtml(p.name)}" ${shiftM === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+        ${getSchedulablePeople().map(p => `<option value="${escapeHtml(p.name)}" ${shiftM === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
       </select>`;
 
       tdP.innerHTML = `<select id="edit-laundry-pomeriggio-${day}" class="input-field" style="padding: 6px; font-size: 12px; width: 100%;">
         <option value="">-</option>
-        ${state.people.map(p => `<option value="${escapeHtml(p.name)}" ${shiftP === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+        ${getSchedulablePeople().map(p => `<option value="${escapeHtml(p.name)}" ${shiftP === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
       </select>`;
     } else {
       tdM.innerHTML = escapeHtml(shiftM) || "-";
@@ -927,8 +935,8 @@ function startWizard() {
 
   // Populate wizard people list
   wizardPeopleList.innerHTML = "";
-  // Admins also take part in the chore rotation, so everyone is selectable here
-  const cadets = state.people;
+  // Admins also take part in the chore rotation (except the default ADMIN login)
+  const cadets = getSchedulablePeople();
 
   if (cadets.length === 0) {
     wizardPeopleList.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Aggiungi prima delle persone nella scheda Persone!</p>`;
@@ -966,7 +974,7 @@ function goToStep2() {
 
   // Show, explicitly, which cadets are NOT flagged as absent: they will be
   // scheduled normally as present every day, with no further action needed.
-  const allCadets = state.people;
+  const allCadets = getSchedulablePeople();
   const absentIds = new Set(wizardSelectedAbsent.map(p => p.id));
   const presentCadets = allCadets.filter(p => !absentIds.has(p.id));
   const presentListEl = document.getElementById("step2-present-list");
@@ -992,7 +1000,7 @@ function goToStep2() {
     
     let daysHTML = "";
     WIZARD_DAYS.forEach(day => {
-      // Unchecked by default (present); spunta solo i giorni in cui è assente
+      // Unchecked by default (absent); spunta solo i giorni in cui è presente
       daysHTML += `<td><input type="checkbox" data-day="${day}"></td>`;
     });
 
@@ -1013,18 +1021,17 @@ function goBackToStep1() {
 function generateCalendar() {
   const newCalendar = createBlankCalendar();
 
-  // Gather absence data
+  // Gather absence data. Step 2's checkboxes mark PRESENCE days (checked =
+  // present), so a person's absent days are whichever of the 7 are NOT checked.
   const absences = {}; // { personId: [absentDays] }
-  
+
   if (wizardSelectedAbsent.length > 0) {
     const rows = absenceTableBody.querySelectorAll("tr[data-person-id]");
     rows.forEach(row => {
       const pId = row.getAttribute("data-person-id");
-      absences[pId] = [];
-      const boxes = row.querySelectorAll('input[type="checkbox"]:checked');
-      boxes.forEach(box => {
-        absences[pId].push(box.getAttribute("data-day").toLowerCase());
-      });
+      const presentBoxes = row.querySelectorAll('input[type="checkbox"]:checked');
+      const presentDays = new Set(Array.from(presentBoxes).map(box => box.getAttribute("data-day").toLowerCase()));
+      absences[pId] = WIZARD_DAYS.filter(d => !presentDays.has(d));
     });
   }
 
@@ -1034,8 +1041,8 @@ function generateCalendar() {
   const partiallyAbsentCadets = []; // { person, absentDays, presentDays }
   const excludedCadets = []; // Fully absent (absent all 7 days)
 
-  // Admins also take part in the chore rotation
-  const cadets = state.people;
+  // Admins also take part in the chore rotation (except the default ADMIN login)
+  const cadets = getSchedulablePeople();
 
   cadets.forEach(p => {
     const personAbsences = absences[p.id] || [];

@@ -927,8 +927,8 @@ function startWizard() {
 
   // Populate wizard people list
   wizardPeopleList.innerHTML = "";
-  // Filter only cadets, admins are excluded from manual chores unless added as cadets
-  const cadets = state.people.filter(p => p.role === "cadetto");
+  // Admins also take part in the chore rotation, so everyone is selectable here
+  const cadets = state.people;
 
   if (cadets.length === 0) {
     wizardPeopleList.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Aggiungi prima delle persone nella scheda Persone!</p>`;
@@ -966,7 +966,7 @@ function goToStep2() {
 
   // Show, explicitly, which cadets are NOT flagged as absent: they will be
   // scheduled normally as present every day, with no further action needed.
-  const allCadets = state.people.filter(p => p.role === "cadetto");
+  const allCadets = state.people;
   const absentIds = new Set(wizardSelectedAbsent.map(p => p.id));
   const presentCadets = allCadets.filter(p => !absentIds.has(p.id));
   const presentListEl = document.getElementById("step2-present-list");
@@ -1034,7 +1034,8 @@ function generateCalendar() {
   const partiallyAbsentCadets = []; // { person, absentDays, presentDays }
   const excludedCadets = []; // Fully absent (absent all 7 days)
 
-  const cadets = state.people.filter(p => p.role === "cadetto");
+  // Admins also take part in the chore rotation
+  const cadets = state.people;
 
   cadets.forEach(p => {
     const personAbsences = absences[p.id] || [];
@@ -1193,17 +1194,12 @@ function generateCalendar() {
   // Sort zones by priority, like tasks.
   const zones = [...state.houseParts].sort((a, b) => a.priority - b.priority);
 
-  // Pool of candidates eligible to be primary assignees: fully present cadets only,
-  // excluding whoever already got the meter reading duty (they shouldn't also be
-  // stuck cleaning a zone). If nobody is fully present this week, fall back to all
-  // active cadets (degenerate case).
-  const zonePrimaryPoolBase = fullyPresentCadets.length > 0 ? fullyPresentCadets : activeCadets;
-  let zonePrimaryPool = zonePrimaryPoolBase.filter(c => !meterCandidate || c.id !== meterCandidate.id);
-  if (zonePrimaryPool.length === 0) {
-    // Excluding the meter reader would leave nobody eligible (very small/absent-heavy
-    // roster): better to double them up than leave zones completely unassigned.
-    zonePrimaryPool = zonePrimaryPoolBase;
-  }
+  // Pool of candidates eligible to be primary assignees: fully present cadets only.
+  // If nobody is fully present this week, fall back to all active cadets (degenerate case).
+  // The meter reader is not excluded outright (that was too rigid and could dump all
+  // zone cleaning on a single other person) - their +2 load from the meter reading
+  // already makes them a lower priority pick, which is enough of a soft deterrent.
+  const zonePrimaryPool = fullyPresentCadets.length > 0 ? fullyPresentCadets : activeCadets;
 
   zones.forEach(zone => {
     const assignedCadets = [];
@@ -1292,16 +1288,21 @@ function generateCalendar() {
   activeCadets.forEach(c => { laundryLoadCounts[c.id] = 0; });
 
   const MIN_SHIFT_GAP = 4; // 4 shifts = 2 days (mattina + pomeriggio per day)
+  const MAX_SHIFTS_PER_PERSON = 2; // nobody can have more than 2 laundry shifts this week
 
   shiftList.forEach((shiftObj, index) => {
     const dailyRoster = getPresentCadetsForDay(shiftObj.day);
     if (dailyRoster.length === 0) return; // Leave the shift empty: nobody present
 
-    // Only consider people who have gone at least MIN_SHIFT_GAP shifts without laundry duty.
-    // The rule is strict: if nobody qualifies, the shift is left unassigned rather than
-    // handing it to someone too soon.
-    const candidates = dailyRoster.filter(c => (index - lastAssignedShiftIndex[c.id]) >= MIN_SHIFT_GAP);
-    if (candidates.length === 0) return; // Leave the shift empty: rule can't be satisfied
+    // Only consider people who have gone at least MIN_SHIFT_GAP shifts without laundry duty
+    // and who haven't already hit the max of MAX_SHIFTS_PER_PERSON shifts this week.
+    // Both rules are strict: if nobody qualifies, the shift is left unassigned rather than
+    // handing it to someone who shouldn't get it.
+    const candidates = dailyRoster.filter(c =>
+      (index - lastAssignedShiftIndex[c.id]) >= MIN_SHIFT_GAP &&
+      laundryLoadCounts[c.id] < MAX_SHIFTS_PER_PERSON
+    );
+    if (candidates.length === 0) return; // Leave the shift empty: rules can't be satisfied
 
     // Among candidates, pick the one with the lowest laundry load to balance shifts fairly
     candidates.sort((a, b) => laundryLoadCounts[a.id] - laundryLoadCounts[b.id]);

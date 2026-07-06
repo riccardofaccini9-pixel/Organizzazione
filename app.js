@@ -42,11 +42,11 @@ const DEFAULT_TASKS = [
 ];
 
 const DEFAULT_HOUSE_PARTS = [
-  { id: "hp1", name: "Cucina" },
-  { id: "hp2", name: "Bagno Primo Piano" },
-  { id: "hp3", name: "Bagno Secondo Piano" },
-  { id: "hp4", name: "Salotto & Corridoio" },
-  { id: "hp5", name: "Scale & Vetrate" }
+  { id: "hp1", name: "Cucina", minPeople: 1, priority: 1 },
+  { id: "hp2", name: "Bagno Primo Piano", minPeople: 1, priority: 2 },
+  { id: "hp3", name: "Bagno Secondo Piano", minPeople: 1, priority: 3 },
+  { id: "hp4", name: "Salotto & Corridoio", minPeople: 1, priority: 4 },
+  { id: "hp5", name: "Scale & Vetrate", minPeople: 1, priority: 5 }
 ];
 
 const DAYS_OF_WEEK = ["giovedì", "venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì"];
@@ -82,6 +82,7 @@ const taskNameInput = document.getElementById("task-name");
 const taskMinPeopleInput = document.getElementById("task-min-people");
 const taskPriorityInput = document.getElementById("task-priority");
 const taskLinkedSelect = document.getElementById("task-linked");
+const taskDescriptionInput = document.getElementById("task-description");
 const saveTaskBtn = document.getElementById("save-task-btn");
 const closeTaskModalBtn = document.getElementById("close-modal-task-btn");
 const addTaskBtn = document.getElementById("add-task-btn");
@@ -99,6 +100,8 @@ const addPersonBtn = document.getElementById("add-person-btn");
 // House Part Modal Form
 const housePartModalHeader = document.getElementById("modal-house-part-header");
 const housePartNameInput = document.getElementById("house-part-name");
+const housePartMinPeopleInput = document.getElementById("house-part-min-people");
+const housePartPriorityInput = document.getElementById("house-part-priority");
 const saveHousePartBtn = document.getElementById("save-house-part-btn");
 const closeHousePartModalBtn = document.getElementById("close-modal-house-part-btn");
 const addHousePartBtn = document.getElementById("add-house-part-btn");
@@ -325,6 +328,7 @@ function openAddTaskModal() {
   taskNameInput.value = "";
   taskMinPeopleInput.value = "1";
   taskPriorityInput.value = "";
+  taskDescriptionInput.value = "";
   updateLinkedTasksDropdowns();
   taskLinkedSelect.value = "none";
   openModal(modalTask);
@@ -339,6 +343,7 @@ function editTask(id) {
   taskNameInput.value = task.name;
   taskMinPeopleInput.value = task.minPeople;
   taskPriorityInput.value = task.priority;
+  taskDescriptionInput.value = task.description || "";
   updateLinkedTasksDropdowns();
   taskLinkedSelect.value = task.linkedTask;
   openModal(modalTask);
@@ -349,6 +354,7 @@ function saveTask() {
   const minPeople = parseInt(taskMinPeopleInput.value) || 1;
   const rawPriority = taskPriorityInput.value.trim();
   const linkedTask = taskLinkedSelect.value;
+  const description = taskDescriptionInput.value.trim();
 
   if (!name) {
     alert("Inserire il nome della mansione!");
@@ -368,13 +374,15 @@ function saveTask() {
     task.minPeople = minPeople;
     task.priority = priority;
     task.linkedTask = linkedTask === editingTaskId ? "none" : linkedTask;
+    task.description = description;
   } else {
     state.tasks.push({
       id: "task-" + Date.now(),
       name,
       minPeople,
       priority,
-      linkedTask
+      linkedTask,
+      description
     });
   }
 
@@ -563,6 +571,8 @@ function openAddHousePartModal() {
   editingHousePartId = null;
   housePartModalHeader.textContent = "Aggiungi Zona di Pulizia";
   housePartNameInput.value = "";
+  housePartMinPeopleInput.value = "1";
+  housePartPriorityInput.value = "";
   openModal(modalHousePart);
 }
 
@@ -573,21 +583,33 @@ function editHousePart(id) {
   editingHousePartId = id;
   housePartModalHeader.textContent = "Modifica Zona di Pulizia";
   housePartNameInput.value = zone.name;
+  housePartMinPeopleInput.value = zone.minPeople;
+  housePartPriorityInput.value = zone.priority;
   openModal(modalHousePart);
 }
 
 function saveHousePart() {
   const name = housePartNameInput.value.trim();
+  const minPeople = parseInt(housePartMinPeopleInput.value) || 1;
+  const rawPriority = housePartPriorityInput.value.trim();
+
   if (!name) {
     alert("Inserire il nome della zona!");
     return;
   }
 
+  let priority = 999;
+  if (rawPriority !== "" && !isNaN(rawPriority)) {
+    priority = parseInt(rawPriority);
+  }
+
   if (editingHousePartId) {
     const zone = state.houseParts.find(z => z.id === editingHousePartId);
     zone.name = name;
+    zone.minPeople = minPeople;
+    zone.priority = priority;
   } else {
-    state.houseParts.push({ id: "hp-" + Date.now(), name });
+    state.houseParts.push({ id: "hp-" + Date.now(), name, minPeople, priority });
   }
 
   localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
@@ -607,7 +629,9 @@ function deleteHousePart(id) {
 
 function populateHousePartsTable() {
   housePartsTableBody.innerHTML = "";
-  state.houseParts.forEach(zone => {
+  const sorted = [...state.houseParts].sort((a, b) => a.priority - b.priority);
+
+  sorted.forEach(zone => {
     const tr = document.createElement("tr");
 
     const actionBtns = state.currentUser.role === "admin"
@@ -621,6 +645,8 @@ function populateHousePartsTable() {
 
     tr.innerHTML = `
       <td><strong>${escapeHtml(zone.name)}</strong></td>
+      <td>${zone.minPeople}</td>
+      <td>${zone.priority}</td>
       ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${actionBtns}</td>` : ''}
     `;
     housePartsTableBody.appendChild(tr);
@@ -642,7 +668,7 @@ function createBlankCalendar() {
   };
 
   state.houseParts.forEach(zone => {
-    cal.houseCleaning[zone.id] = { assigned: "", helpers: [] };
+    cal.houseCleaning[zone.id] = { assigned: [], helpers: [] };
   });
 
   DAYS_OF_WEEK.forEach(day => {
@@ -686,12 +712,12 @@ function saveEditedCalendarState() {
 
   // Save House Cleaning
   state.houseParts.forEach(zone => {
-    const select = document.getElementById(`edit-house-${zone.id}`);
-    if (select) {
+    const input = document.getElementById(`edit-house-${zone.id}`);
+    if (input) {
       if (!state.calendar.houseCleaning[zone.id]) {
-        state.calendar.houseCleaning[zone.id] = { assigned: "", helpers: [] };
+        state.calendar.houseCleaning[zone.id] = { assigned: [], helpers: [] };
       }
-      state.calendar.houseCleaning[zone.id].assigned = select.value;
+      state.calendar.houseCleaning[zone.id].assigned = input.value.split(",").map(s => s.trim()).filter(Boolean);
     }
   });
 
@@ -748,19 +774,18 @@ function renderCalendar() {
 
   // RENDER HOUSE CLEANING
   houseCleaningList.innerHTML = "";
-  state.houseParts.forEach(zone => {
-    const data = state.calendar.houseCleaning[zone.id] || { assigned: "", helpers: [] };
+  const sortedHouseParts = [...state.houseParts].sort((a, b) => a.priority - b.priority);
+  sortedHouseParts.forEach(zone => {
+    const data = state.calendar.houseCleaning[zone.id] || { assigned: [], helpers: [] };
+    const assignedNames = Array.isArray(data.assigned) ? data.assigned : (data.assigned ? [data.assigned] : []);
     const card = document.createElement("div");
     card.className = "house-part-card";
 
     let assigneeHTML = "";
     if (state.isUnlocked) {
-      assigneeHTML = `<select id="edit-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;">
-        <option value="">Nessuno</option>
-        ${state.people.map(p => `<option value="${escapeHtml(p.name)}" ${data.assigned === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
-      </select>`;
+      assigneeHTML = `<input type="text" id="edit-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">`;
     } else {
-      assigneeHTML = `<span class="house-part-assignee">${escapeHtml(data.assigned) || 'Non assegnato'}</span>`;
+      assigneeHTML = `<span class="house-part-assignee">${escapeHtml(assignedNames.join(', ')) || 'Non assegnato'}</span>`;
     }
 
     let helpersHTML = "";
@@ -865,10 +890,14 @@ function renderCalendar() {
     taskExplanations.innerHTML = "<li>Nessuna mansione configurata.</li>";
   } else {
     state.tasks.forEach(t => {
-      const linked = state.tasks.find(lt => lt.id === t.linkedTask);
-      const linkedStr = linked ? ` (Se assegnata, l'addetto svolge anche '${linked.name}')` : "";
       const li = document.createElement("li");
-      li.innerHTML = `<strong>${escapeHtml(t.name)}</strong>: priorità ${t.priority}, minimo ${t.minPeople} addetti.${linkedStr}`;
+      if (t.description && t.description.trim()) {
+        li.innerHTML = `<strong>${escapeHtml(t.name)}</strong>: ${escapeHtml(t.description)}`;
+      } else {
+        const linked = state.tasks.find(lt => lt.id === t.linkedTask);
+        const linkedStr = linked ? ` (Se assegnata, l'addetto svolge anche '${linked.name}')` : "";
+        li.innerHTML = `<strong>${escapeHtml(t.name)}</strong>: priorità ${t.priority}, minimo ${t.minPeople} addetti.${linkedStr}`;
+      }
       taskExplanations.appendChild(li);
     });
   }
@@ -1032,6 +1061,14 @@ function generateCalendar() {
   // Sort tasks by priority
   const sortedTasks = [...state.tasks].sort((a, b) => a.priority - b.priority);
 
+  // Track how many times each person has done each specific task this week,
+  // so the same task doesn't land on the same one or two people every day.
+  const taskAssignmentCounts = {};
+  sortedTasks.forEach(t => {
+    taskAssignmentCounts[t.id] = {};
+    activeCadets.forEach(c => { taskAssignmentCounts[t.id][c.id] = 0; });
+  });
+
   DAYS_OF_WEEK.forEach(day => {
     newCalendar.weekly[day] = [];
     const dailyRoster = getPresentCadetsForDay(day);
@@ -1061,17 +1098,24 @@ function generateCalendar() {
 
         // Sort candidates:
         // 1. Not already assigned to ANY task today (to spread daily work)
-        // 2. Least overall load counts
+        // 2. Least times already assigned to THIS specific task this week (variety)
+        // 3. Least overall load counts (fairness tie-breaker)
         candidates.sort((a, b) => {
           const aToday = dailyAssignedIds.has(a.id) ? 1 : 0;
           const bToday = dailyAssignedIds.has(b.id) ? 1 : 0;
           if (aToday !== bToday) return aToday - bToday;
+
+          const aTaskCount = taskAssignmentCounts[task.id][a.id];
+          const bTaskCount = taskAssignmentCounts[task.id][b.id];
+          if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+
           return loadCounts[a.id] - loadCounts[b.id];
         });
 
         const selected = candidates[0];
         assignedCadets.push(selected);
         dailyAssignedIds.add(selected.id);
+        taskAssignmentCounts[task.id][selected.id]++;
         loadCounts[selected.id]++;
       }
 
@@ -1123,27 +1167,37 @@ function generateCalendar() {
   }
 
   // 3. HOUSE CLEANING (PULIZIA CASA)
-  // We assign a single primary person from activeCadets to each zone.
-  // We also specify helpers: partially present cadets are added as helpers to zones on the days they are present.
-  
-  // Sort zones
-  const zones = [...state.houseParts];
+  // A zone is assigned to primary people for the whole week, so only cadets
+  // present every single day are eligible as primary assignees. Cadets present
+  // only part of the week are added as "helpers" instead (see below), never as
+  // primaries, since they can't cover the zone the days they're away.
+  // Sort zones by priority, like tasks.
+  const zones = [...state.houseParts].sort((a, b) => a.priority - b.priority);
 
-  // Assign primary people to zones
-  zones.forEach((zone, idx) => {
-    // Sort active cadets by current load count ascending
-    activeCadets.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
-    const primary = activeCadets[0];
+  // Pool of candidates eligible to be primary assignees: fully present cadets only.
+  // If nobody is fully present this week, fall back to all active cadets (degenerate case).
+  const zonePrimaryPool = fullyPresentCadets.length > 0 ? fullyPresentCadets : activeCadets;
+
+  zones.forEach(zone => {
+    const assignedCadets = [];
+
+    for (let i = 0; i < zone.minPeople; i++) {
+      const candidates = zonePrimaryPool.filter(c => !assignedCadets.includes(c));
+      if (candidates.length === 0) break;
+
+      candidates.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
+      const selected = candidates[0];
+      assignedCadets.push(selected);
+      loadCounts[selected.id] += 3; // House cleaning carries more weight
+    }
 
     newCalendar.houseCleaning[zone.id] = {
-      assigned: primary.name,
+      assigned: assignedCadets.map(c => c.name),
       helpers: []
     };
-
-    loadCounts[primary.id] += 3; // House cleaning carries more weight
   });
 
-  // Distribute partially absent cadets as helpers to the house cleaning zones
+  // Distribute partially absent cadets as helpers to the house cleaning zones.
   // We want to add them as helpers specifically when they are present.
   if (zones.length > 0) {
     partiallyAbsentCadets.forEach((item, idx) => {

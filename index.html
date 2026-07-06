@@ -292,6 +292,8 @@
               <thead>
                 <tr>
                   <th>Nome Zona</th>
+                  <th>Min Persone</th>
+                  <th>Priorità</th>
                   <th class="admin-only" style="width: 80px; text-align: center;">Azioni</th>
                 </tr>
               </thead>
@@ -433,6 +435,11 @@
         </select>
       </div>
 
+      <div class="input-group">
+        <label class="input-label" for="task-description">Spiegazione (facoltativa, mostrata in Visualizzazione)</label>
+        <textarea id="task-description" class="input-field" rows="3" placeholder="Es. Lavare tutti i piatti e le pentole usate a pranzo e cena"></textarea>
+      </div>
+
       <div class="modal-actions">
         <button id="close-modal-task-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
         <button id="save-task-btn" class="btn btn-primary" style="width: auto;">Salva</button>
@@ -483,6 +490,16 @@
       <div class="input-group">
         <label class="input-label" for="house-part-name">Nome Zona</label>
         <input type="text" id="house-part-name" class="input-field" placeholder="Es. Cucina" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="house-part-min-people">Numero Minimo Persone</label>
+        <input type="number" id="house-part-min-people" class="input-field" value="1" min="1" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="house-part-priority">Priorità (1 = Max, 999 = Min)</label>
+        <input type="text" id="house-part-priority" class="input-field" placeholder="Es. 1 (o inserisci testo per 999)">
       </div>
 
       <div class="modal-actions">

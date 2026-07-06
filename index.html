@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario Mansioni & Pulizie</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- LOGIN VIEW -->
+  <div id="login-view" class="login-container">
+    <div class="login-card">
+      <div class="logo-space">
+        <svg viewBox="0 0 24 24">
+          <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" />
+        </svg>
+      </div>
+      <h1 class="login-title">Accedi al Portale</h1>
+      
+      <div class="input-group">
+        <label class="input-label" for="login-email">Email</label>
+        <input type="email" id="login-email" class="input-field" placeholder="esempio@mail.com" required>
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label" for="login-password">Password</label>
+        <input type="password" id="login-password" class="input-field" placeholder="••••••••" required>
+      </div>
+      
+      <button id="login-submit-btn" class="btn btn-primary">
+        Accedi
+      </button>
+      
+      <div id="login-error" class="error-message">Credenziali non valide</div>
+    </div>
+  </div>
+
+  <!-- MAIN APP WRAPPER -->
+  <div id="app-view" class="app-wrapper">
+    
+    <!-- MAIN CONTENT AREA (Left) -->
+    <main class="main-content">
+      
+      <!-- TAB: VISUALIZZA CALENDARIO -->
+      <section id="tab-visualizzazione" class="tab-content active">
+        <div class="page-header">
+          <h2 class="page-title">Visualizzazione Calendario</h2>
+          <div class="header-actions">
+            <!-- Lock button, visible only for Admin -->
+            <button id="lock-toggle-btn" class="lock-toggle-btn" title="Modifica assegnazioni">
+              <svg id="lock-icon-closed" viewBox="0 0 24 24">
+                <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" />
+              </svg>
+              <svg id="lock-icon-open" viewBox="0 0 24 24" style="display: none;">
+                <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8H17V6A5,5 0 0,0 12,1A5,5 0 0,0 7,6H9A3,3 0 0,1 12,3A3,3 0 0,1 15,6V8H6A2,2 0 0,0 4,10V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V10A2,2 0 0,0 18,8Z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- METER READING -->
+        <div class="card meter-card">
+          <h3 class="card-title">Lettura contatori</h3>
+          <div id="meter-display-container">
+            <span id="meter-assignee-text" class="meter-value">-</span>
+          </div>
+        </div>
+
+        <!-- HOUSE CLEANING -->
+        <div class="card">
+          <h3 class="card-title">Pulizia Casa</h3>
+          <div id="house-cleaning-list" class="house-cleaning-grid">
+            <!-- Dynamically populated -->
+            <div class="house-part-card">
+              <div class="house-part-name">Zona Giorno</div>
+              <div class="house-part-assignee">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WEEKLY CALENDAR -->
+        <div id="weekly-calendar-container" class="calendar-days-container">
+          <!-- Columns for Thursday to Wednesday -->
+          <div class="day-column" data-day="giovedì">
+            <div class="day-header">giovedì</div>
+            <div class="day-tasks-list"></div>
+          </div>
+          <div class="day-column" data-day="venerdì">
+            <div class="day-header">venerdì</div>
+            <div class="day-tasks-list"></div>
+          </div>
+          <div class="day-column" data-day="sabato">
+            <div class="day-header">sabato</div>
+            <div class="day-tasks-list"></div>
+          </div>
+          <div class="day-column" data-day="domenica">
+            <div class="day-header">domenica</div>
+            <div class="day-tasks-list"></div>
+          </div>
+          <div class="day-column" data-day="lunedì">
+            <div class="day-header">lunedì</div>
+            <div class="day-tasks-list"></div>
+          </div>
+          <div class="day-column" data-day="martedì">
+            <div class="day-header">martedì</div>
+            <div class="day-tasks-list"></div>
+          </div>
+          <div class="day-column" data-day="mercoledì">
+            <div class="day-header">mercoledì</div>
+            <div class="day-tasks-list"></div>
+          </div>
+        </div>
+
+        <!-- EVENING CHECK -->
+        <div class="card">
+          <h3 class="card-title">Controllo Serale</h3>
+          <div id="evening-check-list" class="evening-check-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- LAUNDRY TABLE -->
+        <div class="card">
+          <h3 class="card-title">Turni Lavanderia</h3>
+          <div class="table-responsive">
+            <table class="laundry-table">
+              <thead>
+                <tr id="laundry-days-header">
+                  <th>Turno</th>
+                  <th>giovedì</th>
+                  <th>venerdì</th>
+                  <th>sabato</th>
+                  <th>domenica</th>
+                  <th>lunedì</th>
+                  <th>martedì</th>
+                  <th>mercoledì</th>
+                </tr>
+              </thead>
+              <tbody id="laundry-table-body">
+                <tr data-shift="mattina">
+                  <td class="laundry-shift-label">Mattina</td>
+                  <!-- Tds populated dynamically -->
+                  <td data-day="giovedì">-</td>
+                  <td data-day="venerdì">-</td>
+                  <td data-day="sabato">-</td>
+                  <td data-day="domenica">-</td>
+                  <td data-day="lunedì">-</td>
+                  <td data-day="martedì">-</td>
+                  <td data-day="mercoledì">-</td>
+                </tr>
+                <tr data-shift="pomeriggio">
+                  <td class="laundry-shift-label">Pomeriggio</td>
+                  <!-- Tds populated dynamically -->
+                  <td data-day="giovedì">-</td>
+                  <td data-day="venerdì">-</td>
+                  <td data-day="sabato">-</td>
+                  <td data-day="domenica">-</td>
+                  <td data-day="lunedì">-</td>
+                  <td data-day="martedì">-</td>
+                  <td data-day="mercoledì">-</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- EXPLANATIONS SECTION -->
+        <div class="card">
+          <h3 class="card-title">Spiegazione delle Attività</h3>
+          <ul id="task-explanations" class="desc-list">
+            <!-- Dynamically populated from Modifica Mansioni -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- TAB: GENERAZIONE CALENDARIO -->
+      <section id="tab-generazione" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Generazione Calendario</h2>
+        </div>
+
+        <div class="card">
+          <!-- INITIAL SCREEN -->
+          <div id="gen-step-init" class="wizard-container">
+            <button id="start-wizard-btn" class="btn-generate-main">Genera calendario</button>
+          </div>
+
+          <!-- STEP 1: SELECT ABSENT PEOPLE -->
+          <div id="gen-step-absent" class="wizard-step">
+            <h3 class="card-title">Passo 1: Seleziona i Cadetti Assenti</h3>
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+              Seleziona le persone che saranno assenti (parzialmente o totalmente) per questa settimana da escludere dalla normale rotazione delle mansioni.
+            </p>
+            
+            <div id="wizard-people-list" class="people-checkbox-grid">
+              <!-- Dynamically populated with people -->
+            </div>
+
+            <div class="wizard-footer">
+              <button id="confirm-absent-btn" class="btn btn-primary" style="width: auto; padding-left: 30px; padding-right: 30px;">
+                Conferma Assenti
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 2: SELECT DETAILED ABSENCES -->
+          <div id="gen-step-details" class="wizard-step">
+            <h3 class="card-title">Passo 2: Giorni di Assenza Specifici</h3>
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+              Specifica quali giorni i cadetti selezionati saranno assenti. Se un cadetto è assente tutti i giorni (Lunedì-Domenica), verrà escluso interamente. Se è assente solo alcuni giorni, aiuterà nelle pulizie quando presente.
+            </p>
+
+            <div class="table-responsive">
+              <table class="absence-table">
+                <thead>
+                  <tr>
+                    <th>Cadetto</th>
+                    <th>Lunedì</th>
+                    <th>Martedì</th>
+                    <th>Mercoledì</th>
+                    <th>Giovedì</th>
+                    <th>Venerdì</th>
+                    <th>Sabato</th>
+                    <th>Domenica</th>
+                  </tr>
+                </thead>
+                <tbody id="absence-table-body">
+                  <!-- Dynamically populated with rows for selected people -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="wizard-footer" style="justify-content: space-between; align-items: center;">
+              <button id="back-to-step1-btn" class="btn btn-secondary" style="width: auto;">Indietro</button>
+              <button id="generate-final-btn" class="btn btn-success" style="width: auto; padding-left: 30px; padding-right: 30px;">
+                Genera Calendario
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: MODIFICA MANSIONI -->
+      <section id="tab-mansioni" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Gestione Mansioni</h2>
+          <div class="header-actions">
+            <!-- Only visible/enabled for admin -->
+            <button id="add-task-btn" class="add-btn admin-only">
+              <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+              </svg>
+              Aggiungi Mansione
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome Attività</th>
+                  <th>Min Persone</th>
+                  <th>Priorità</th>
+                  <th>Attività Collegata</th>
+                  <th class="admin-only" style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="tasks-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: MODIFICA PERSONE -->
+      <section id="tab-persone" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Gestione Persone (Cadetti)</h2>
+          <div class="header-actions">
+            <!-- Only visible/enabled for admin -->
+            <button id="add-person-btn" class="add-btn admin-only">
+              <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+              </svg>
+              Aggiungi Persona
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Email</th>
+                  <th>Ruolo</th>
+                  <th class="admin-only" style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="people-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- SIDEBAR NAVIGATION (Right) -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M19,19H5V8H19M16,1H13V3H11V1H8V3H6V5H18V3H16M19,5H5C3.89,5 3,5.89 3,7V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V7C21,5.89 20.1,5 19,5Z" />
+            </svg>
+          </div>
+          <span class="sidebar-logo-text">CleanSchedule</span>
+        </div>
+
+        <nav>
+          <ul class="nav-menu">
+            <li class="nav-item active" data-tab="tab-visualizzazione">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M9,10H7V12H9V10M13,10H11V12H13V10M17,10H15V12H17V10M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V8H19V19Z" />
+                </svg>
+                <span>Visualizzazione</span>
+              </button>
+            </li>
+            <li class="nav-item admin-only" data-tab="tab-generazione">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,14.21 4.9,16.21 6.34,17.65L7.75,16.24C6.67,15.16 6,13.66 6,12A6,6 0 0,1 12,6M17.66,6.34L16.25,7.75C17.33,8.83 18,10.34 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,9.79 19.1,7.79 17.66,6.34Z" />
+                </svg>
+                <span>Genera Turni</span>
+              </button>
+            </li>
+            <li class="nav-item" data-tab="tab-mansioni">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M14,10H19.5L14,4.5V10M5,3H15L21,9V21A2,2 0 0,1 19,23H5C3.89,23 3,22.1 3,21V5C3,3.89 3.89,3 5,3M5,5V21H19V12H12V5H5M7,9H10V11H7V9M7,13H17V15H7V13M7,17H17V19H7V17Z" />
+                </svg>
+                <span>Mansioni</span>
+              </button>
+            </li>
+            <li class="nav-item" data-tab="tab-persone">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M16,13C15.71,13 15.38,13 15.03,13.05C16.19,13.89 17,15 17,16.5V19H23V16.5C23,14.17 18.33,13 16,13M8,13C5.67,13 1,14.17 1,16.5V19H15V16.5C15,14.17 10.33,13 8,13M8,11A3,3 0 0,0 11,8A3,3 0 0,0 8,5A3,3 0 0,0 5,8A3,3 0 0,0 8,11M16,11A3,3 0 0,0 19,8A3,3 0 0,0 16,5A3,3 0 0,0 13,8A3,3 0 0,0 16,11Z" />
+                </svg>
+                <span>Persone</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="user-profile">
+          <div id="user-avatar-initial" class="user-avatar">A</div>
+          <div class="user-info">
+            <span id="user-display-name" class="user-name">Caricamento...</span>
+            <span id="user-display-role" class="user-role">-</span>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-secondary" style="padding: 10px;">
+          Esci
+        </button>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- MODAL: ADD TASK -->
+  <div id="modal-task" class="modal-overlay">
+    <div class="modal-card">
+      <h3 class="modal-header">Aggiungi Nuova Mansione</h3>
+      
+      <div class="input-group">
+        <label class="input-label" for="task-name">Nome Attività</label>
+        <input type="text" id="task-name" class="input-field" placeholder="Es. Pulizia Cucina" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="task-min-people">Numero Minimo Persone</label>
+        <input type="number" id="task-min-people" class="input-field" value="1" min="1" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="task-priority">Priorità (1 = Max, 999 = Min)</label>
+        <input type="text" id="task-priority" class="input-field" placeholder="Es. 1 (o inserisci testo per 999)">
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="task-linked">Attività Collegata</label>
+        <select id="task-linked" class="input-field">
+          <option value="none">Nessuna</option>
+          <!-- Populate dynamically with existing tasks -->
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-modal-task-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
+        <button id="save-task-btn" class="btn btn-primary" style="width: auto;">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD PERSON -->
+  <div id="modal-person" class="modal-overlay">
+    <div class="modal-card">
+      <h3 class="modal-header">Aggiungi Nuovo Utente (Cadetto)</h3>
+      
+      <div class="input-group">
+        <label class="input-label" for="person-name">Nome</label>
+        <input type="text" id="person-name" class="input-field" placeholder="Es. Mario Rossi" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="person-email">Email</label>
+        <input type="email" id="person-email" class="input-field" placeholder="mario@esempio.com" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="person-password">Password</label>
+        <input type="password" id="person-password" class="input-field" placeholder="••••••••" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="person-role">Ruolo (Permessi)</label>
+        <select id="person-role" class="input-field">
+          <option value="cadetto">Cadetto</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-modal-person-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
+        <button id="save-person-btn" class="btn btn-primary" style="width: auto;">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

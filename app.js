@@ -3,9 +3,15 @@ let state = {
   currentUser: null,
   people: [],
   tasks: [],
+  houseParts: [],
   calendar: null,
   isUnlocked: false
 };
+
+// Track whether the task/person/house-part modal is in "add" or "edit" mode
+let editingTaskId = null;
+let editingPersonId = null;
+let editingHousePartId = null;
 
 // INITIAL SEED DATA
 const DEFAULT_ADMIN = {
@@ -35,12 +41,12 @@ const DEFAULT_TASKS = [
   { id: "t5", name: "Asciugare stoviglie", minPeople: 1, priority: 5, linkedTask: "t1" } // Linked to Lavare i piatti
 ];
 
-const HOUSE_PARTS = [
-  "Cucina",
-  "Bagno Primo Piano",
-  "Bagno Secondo Piano",
-  "Salotto & Corridoio",
-  "Scale & Vetrate"
+const DEFAULT_HOUSE_PARTS = [
+  { id: "hp1", name: "Cucina" },
+  { id: "hp2", name: "Bagno Primo Piano" },
+  { id: "hp3", name: "Bagno Secondo Piano" },
+  { id: "hp4", name: "Salotto & Corridoio" },
+  { id: "hp5", name: "Scale & Vetrate" }
 ];
 
 const DAYS_OF_WEEK = ["giovedì", "venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì"];
@@ -68,8 +74,10 @@ const logoutBtn = document.getElementById("logout-btn");
 // Modals
 const modalTask = document.getElementById("modal-task");
 const modalPerson = document.getElementById("modal-person");
+const modalHousePart = document.getElementById("modal-house-part");
 
 // Task Modal Form
+const taskModalHeader = document.getElementById("modal-task-header");
 const taskNameInput = document.getElementById("task-name");
 const taskMinPeopleInput = document.getElementById("task-min-people");
 const taskPriorityInput = document.getElementById("task-priority");
@@ -79,6 +87,7 @@ const closeTaskModalBtn = document.getElementById("close-modal-task-btn");
 const addTaskBtn = document.getElementById("add-task-btn");
 
 // Person Modal Form
+const personModalHeader = document.getElementById("modal-person-header");
 const personNameInput = document.getElementById("person-name");
 const personEmailInput = document.getElementById("person-email");
 const personPasswordInput = document.getElementById("person-password");
@@ -87,9 +96,17 @@ const savePersonBtn = document.getElementById("save-person-btn");
 const closePersonModalBtn = document.getElementById("close-modal-person-btn");
 const addPersonBtn = document.getElementById("add-person-btn");
 
+// House Part Modal Form
+const housePartModalHeader = document.getElementById("modal-house-part-header");
+const housePartNameInput = document.getElementById("house-part-name");
+const saveHousePartBtn = document.getElementById("save-house-part-btn");
+const closeHousePartModalBtn = document.getElementById("close-modal-house-part-btn");
+const addHousePartBtn = document.getElementById("add-house-part-btn");
+
 // Tables Bodies
 const tasksTableBody = document.getElementById("tasks-table-body");
 const peopleTableBody = document.getElementById("people-table-body");
+const housePartsTableBody = document.getElementById("house-parts-table-body");
 
 // Lock button
 const lockToggleBtn = document.getElementById("lock-toggle-btn");
@@ -117,6 +134,7 @@ const generateFinalBtn = document.getElementById("generate-final-btn");
 // LOCAL STORAGE STORAGE KEYS
 const STORAGE_PEOPLE = "clean_calendar_people";
 const STORAGE_TASKS = "clean_calendar_tasks";
+const STORAGE_HOUSE_PARTS = "clean_calendar_house_parts";
 const STORAGE_CALENDAR = "clean_calendar_current";
 
 // LOAD INITIAL STATE
@@ -139,6 +157,15 @@ function init() {
     localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
   }
 
+  // Load House Cleaning Zones
+  const storedHouseParts = localStorage.getItem(STORAGE_HOUSE_PARTS);
+  if (storedHouseParts) {
+    state.houseParts = JSON.parse(storedHouseParts);
+  } else {
+    state.houseParts = [...DEFAULT_HOUSE_PARTS];
+    localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
+  }
+
   // Load Calendar
   const storedCalendar = localStorage.getItem(STORAGE_CALENDAR);
   if (storedCalendar) {
@@ -157,13 +184,17 @@ function init() {
   });
 
   // Modals Buttons
-  addTaskBtn.addEventListener("click", () => openModal(modalTask));
+  addTaskBtn.addEventListener("click", () => openAddTaskModal());
   closeTaskModalBtn.addEventListener("click", () => closeModal(modalTask));
   saveTaskBtn.addEventListener("click", saveTask);
 
-  addPersonBtn.addEventListener("click", () => openModal(modalPerson));
+  addPersonBtn.addEventListener("click", () => openAddPersonModal());
   closePersonModalBtn.addEventListener("click", () => closeModal(modalPerson));
   savePersonBtn.addEventListener("click", savePerson);
+
+  addHousePartBtn.addEventListener("click", () => openAddHousePartModal());
+  closeHousePartModalBtn.addEventListener("click", () => closeModal(modalHousePart));
+  saveHousePartBtn.addEventListener("click", saveHousePart);
 
   // Lock Toggle Button
   lockToggleBtn.addEventListener("click", toggleLock);
@@ -226,23 +257,13 @@ function showApp() {
   loginView.style.display = "none";
   appView.style.display = "flex";
 
-  // Setup user details
-  userAvatarInitial.textContent = state.currentUser.name.charAt(0).toUpperCase();
-  userDisplayName.textContent = state.currentUser.name;
-  userDisplayRole.textContent = state.currentUser.role;
-
-  // Handle Role-based Permissions visibility
-  if (state.currentUser.role === "admin") {
-    document.querySelectorAll(".admin-only").forEach(el => el.style.display = "");
-    lockToggleBtn.style.display = "flex";
-  } else {
-    document.querySelectorAll(".admin-only").forEach(el => el.style.display = "none");
-    lockToggleBtn.style.display = "none";
-  }
+  // Setup user details and role-based permissions visibility
+  refreshCurrentUserUI();
 
   // Populate data
   populateTasksTable();
   populatePeopleTable();
+  populateHousePartsTable();
   updateLinkedTasksDropdowns();
   
   if (state.calendar) {
@@ -298,6 +319,31 @@ function updateLinkedTasksDropdowns() {
   });
 }
 
+function openAddTaskModal() {
+  editingTaskId = null;
+  taskModalHeader.textContent = "Aggiungi Nuova Mansione";
+  taskNameInput.value = "";
+  taskMinPeopleInput.value = "1";
+  taskPriorityInput.value = "";
+  updateLinkedTasksDropdowns();
+  taskLinkedSelect.value = "none";
+  openModal(modalTask);
+}
+
+function editTask(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task) return;
+
+  editingTaskId = id;
+  taskModalHeader.textContent = "Modifica Mansione";
+  taskNameInput.value = task.name;
+  taskMinPeopleInput.value = task.minPeople;
+  taskPriorityInput.value = task.priority;
+  updateLinkedTasksDropdowns();
+  taskLinkedSelect.value = task.linkedTask;
+  openModal(modalTask);
+}
+
 function saveTask() {
   const name = taskNameInput.value.trim();
   const minPeople = parseInt(taskMinPeopleInput.value) || 1;
@@ -315,22 +361,25 @@ function saveTask() {
     priority = parseInt(rawPriority);
   }
 
-  const newTask = {
-    id: "task-" + Date.now(),
-    name,
-    minPeople,
-    priority,
-    linkedTask
-  };
+  if (editingTaskId) {
+    // A task cannot be linked to itself
+    const task = state.tasks.find(t => t.id === editingTaskId);
+    task.name = name;
+    task.minPeople = minPeople;
+    task.priority = priority;
+    task.linkedTask = linkedTask === editingTaskId ? "none" : linkedTask;
+  } else {
+    state.tasks.push({
+      id: "task-" + Date.now(),
+      name,
+      minPeople,
+      priority,
+      linkedTask
+    });
+  }
 
-  state.tasks.push(newTask);
   localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
-  
-  // Clear forms
-  taskNameInput.value = "";
-  taskMinPeopleInput.value = "1";
-  taskPriorityInput.value = "";
-  taskLinkedSelect.value = "none";
+  editingTaskId = null;
 
   closeModal(modalTask);
   populateTasksTable();
@@ -362,8 +411,11 @@ function populateTasksTable() {
     const linkedName = linked ? linked.name : "Nessuna";
     const tr = document.createElement("tr");
 
-    const deleteBtn = state.currentUser.role === "admin"
-      ? `<button class="action-btn-danger" onclick="deleteTask('${t.id}')">
+    const actionBtns = state.currentUser.role === "admin"
+      ? `<button class="action-btn-edit" onclick="editTask('${t.id}')">
+          <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
+         </button>
+         <button class="action-btn-danger" onclick="deleteTask('${t.id}')">
           <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
          </button>`
       : "";
@@ -373,10 +425,33 @@ function populateTasksTable() {
       <td>${t.minPeople}</td>
       <td>${t.priority}</td>
       <td><span style="color: var(--accent-color);">${escapeHtml(linkedName)}</span></td>
-      ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${deleteBtn}</td>` : ''}
+      ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${actionBtns}</td>` : ''}
     `;
     tasksTableBody.appendChild(tr);
   });
+}
+
+function openAddPersonModal() {
+  editingPersonId = null;
+  personModalHeader.textContent = "Aggiungi Nuovo Utente (Cadetto)";
+  personNameInput.value = "";
+  personEmailInput.value = "";
+  personPasswordInput.value = "";
+  personRoleSelect.value = "cadetto";
+  openModal(modalPerson);
+}
+
+function editPerson(id) {
+  const person = state.people.find(p => p.id === id);
+  if (!person) return;
+
+  editingPersonId = id;
+  personModalHeader.textContent = "Modifica Utente";
+  personNameInput.value = person.name;
+  personEmailInput.value = person.email;
+  personPasswordInput.value = person.password;
+  personRoleSelect.value = person.role;
+  openModal(modalPerson);
 }
 
 function savePerson() {
@@ -390,30 +465,60 @@ function savePerson() {
     return;
   }
 
-  // Check unique email
-  if (state.people.some(p => p.email.toLowerCase() === email.toLowerCase())) {
+  // Check unique email (excluding the person currently being edited)
+  const emailTaken = state.people.some(
+    p => p.email.toLowerCase() === email.toLowerCase() && p.id !== editingPersonId
+  );
+  if (emailTaken) {
     alert("Email già registrata!");
     return;
   }
 
-  const newPerson = {
-    id: "person-" + Date.now(),
-    name,
-    email,
-    password,
-    role
-  };
+  if (editingPersonId) {
+    const person = state.people.find(p => p.id === editingPersonId);
+    person.name = name;
+    person.email = email;
+    person.password = password;
+    if (editingPersonId !== "admin-default") {
+      person.role = role;
+    }
 
-  state.people.push(newPerson);
+    // If the admin is editing their own account, keep the session in sync
+    if (state.currentUser.id === editingPersonId) {
+      state.currentUser = person;
+      sessionStorage.setItem("logged_in_user", JSON.stringify(person));
+      refreshCurrentUserUI();
+    }
+  } else {
+    state.people.push({
+      id: "person-" + Date.now(),
+      name,
+      email,
+      password,
+      role
+    });
+  }
+
   localStorage.setItem(STORAGE_PEOPLE, JSON.stringify(state.people));
-
-  personNameInput.value = "";
-  personEmailInput.value = "";
-  personPasswordInput.value = "";
-  personRoleSelect.value = "cadetto";
+  editingPersonId = null;
 
   closeModal(modalPerson);
   populatePeopleTable();
+  renderCalendar(); // Assignee names showing this person may need refreshing
+}
+
+function refreshCurrentUserUI() {
+  userAvatarInitial.textContent = state.currentUser.name.charAt(0).toUpperCase();
+  userDisplayName.textContent = state.currentUser.name;
+  userDisplayRole.textContent = state.currentUser.role;
+
+  if (state.currentUser.role === "admin") {
+    document.querySelectorAll(".admin-only").forEach(el => el.style.display = "");
+    lockToggleBtn.style.display = "flex";
+  } else {
+    document.querySelectorAll(".admin-only").forEach(el => el.style.display = "none");
+    lockToggleBtn.style.display = "none";
+  }
 }
 
 function deletePerson(id) {
@@ -431,6 +536,12 @@ function populatePeopleTable() {
   state.people.forEach(p => {
     const tr = document.createElement("tr");
 
+    const editBtn = state.currentUser.role === "admin"
+      ? `<button class="action-btn-edit" onclick="editPerson('${p.id}')">
+          <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
+         </button>`
+      : "";
+
     const deleteBtn = (state.currentUser.role === "admin" && p.id !== "admin-default")
       ? `<button class="action-btn-danger" onclick="deletePerson('${p.id}')">
           <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
@@ -441,9 +552,78 @@ function populatePeopleTable() {
       <td><strong>${escapeHtml(p.name)}</strong></td>
       <td>${escapeHtml(p.email)}</td>
       <td><span class="badge badge-${p.role}">${p.role}</span></td>
-      ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${deleteBtn}</td>` : ''}
+      ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${editBtn}${deleteBtn}</td>` : ''}
     `;
     peopleTableBody.appendChild(tr);
+  });
+}
+
+// HOUSE CLEANING ZONES MANAGEMENT
+function openAddHousePartModal() {
+  editingHousePartId = null;
+  housePartModalHeader.textContent = "Aggiungi Zona di Pulizia";
+  housePartNameInput.value = "";
+  openModal(modalHousePart);
+}
+
+function editHousePart(id) {
+  const zone = state.houseParts.find(z => z.id === id);
+  if (!zone) return;
+
+  editingHousePartId = id;
+  housePartModalHeader.textContent = "Modifica Zona di Pulizia";
+  housePartNameInput.value = zone.name;
+  openModal(modalHousePart);
+}
+
+function saveHousePart() {
+  const name = housePartNameInput.value.trim();
+  if (!name) {
+    alert("Inserire il nome della zona!");
+    return;
+  }
+
+  if (editingHousePartId) {
+    const zone = state.houseParts.find(z => z.id === editingHousePartId);
+    zone.name = name;
+  } else {
+    state.houseParts.push({ id: "hp-" + Date.now(), name });
+  }
+
+  localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
+  editingHousePartId = null;
+
+  closeModal(modalHousePart);
+  populateHousePartsTable();
+  renderCalendar();
+}
+
+function deleteHousePart(id) {
+  state.houseParts = state.houseParts.filter(z => z.id !== id);
+  localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
+  populateHousePartsTable();
+  renderCalendar();
+}
+
+function populateHousePartsTable() {
+  housePartsTableBody.innerHTML = "";
+  state.houseParts.forEach(zone => {
+    const tr = document.createElement("tr");
+
+    const actionBtns = state.currentUser.role === "admin"
+      ? `<button class="action-btn-edit" onclick="editHousePart('${zone.id}')">
+          <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
+         </button>
+         <button class="action-btn-danger" onclick="deleteHousePart('${zone.id}')">
+          <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
+         </button>`
+      : "";
+
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(zone.name)}</strong></td>
+      ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${actionBtns}</td>` : ''}
+    `;
+    housePartsTableBody.appendChild(tr);
   });
 }
 
@@ -461,8 +641,8 @@ function createBlankCalendar() {
     exceptions: []
   };
 
-  HOUSE_PARTS.forEach(part => {
-    cal.houseCleaning[part] = { assigned: "", helpers: [] };
+  state.houseParts.forEach(zone => {
+    cal.houseCleaning[zone.id] = { assigned: "", helpers: [] };
   });
 
   DAYS_OF_WEEK.forEach(day => {
@@ -505,10 +685,13 @@ function saveEditedCalendarState() {
   }
 
   // Save House Cleaning
-  HOUSE_PARTS.forEach(part => {
-    const select = document.getElementById(`edit-house-${part.replace(/\s+/g, '-')}`);
+  state.houseParts.forEach(zone => {
+    const select = document.getElementById(`edit-house-${zone.id}`);
     if (select) {
-      state.calendar.houseCleaning[part].assigned = select.value;
+      if (!state.calendar.houseCleaning[zone.id]) {
+        state.calendar.houseCleaning[zone.id] = { assigned: "", helpers: [] };
+      }
+      state.calendar.houseCleaning[zone.id].assigned = select.value;
     }
   });
 
@@ -565,14 +748,14 @@ function renderCalendar() {
 
   // RENDER HOUSE CLEANING
   houseCleaningList.innerHTML = "";
-  HOUSE_PARTS.forEach(part => {
-    const data = state.calendar.houseCleaning[part] || { assigned: "", helpers: [] };
+  state.houseParts.forEach(zone => {
+    const data = state.calendar.houseCleaning[zone.id] || { assigned: "", helpers: [] };
     const card = document.createElement("div");
     card.className = "house-part-card";
 
     let assigneeHTML = "";
     if (state.isUnlocked) {
-      assigneeHTML = `<select id="edit-house-${part.replace(/\s+/g, '-')}" class="input-field" style="padding: 6px 10px; font-size: 13px;">
+      assigneeHTML = `<select id="edit-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;">
         <option value="">Nessuno</option>
         ${state.people.map(p => `<option value="${escapeHtml(p.name)}" ${data.assigned === p.name ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
       </select>`;
@@ -588,7 +771,7 @@ function renderCalendar() {
     }
 
     card.innerHTML = `
-      <div class="house-part-name">${escapeHtml(part)}</div>
+      <div class="house-part-name">${escapeHtml(zone.name)}</div>
       <div class="house-part-assignee-container" style="margin-top: 4px;">
         ${assigneeHTML}
       </div>
@@ -761,8 +944,8 @@ function goToStep2() {
     
     let daysHTML = "";
     WIZARD_DAYS.forEach(day => {
-      // Checked by default to mark full absence, let them uncheck for partial absence
-      daysHTML += `<td><input type="checkbox" data-day="${day}" checked></td>`;
+      // Unchecked by default (present); spunta solo i giorni in cui è assente
+      daysHTML += `<td><input type="checkbox" data-day="${day}"></td>`;
     });
 
     tr.innerHTML = `
@@ -944,33 +1127,35 @@ function generateCalendar() {
   // We also specify helpers: partially present cadets are added as helpers to zones on the days they are present.
   
   // Sort zones
-  const zones = [...HOUSE_PARTS];
-  
+  const zones = [...state.houseParts];
+
   // Assign primary people to zones
   zones.forEach((zone, idx) => {
     // Sort active cadets by current load count ascending
     activeCadets.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
     const primary = activeCadets[0];
-    
-    newCalendar.houseCleaning[zone] = {
+
+    newCalendar.houseCleaning[zone.id] = {
       assigned: primary.name,
       helpers: []
     };
-    
+
     loadCounts[primary.id] += 3; // House cleaning carries more weight
   });
 
   // Distribute partially absent cadets as helpers to the house cleaning zones
   // We want to add them as helpers specifically when they are present.
-  partiallyAbsentCadets.forEach((item, idx) => {
-    // Map to a cleaning zone (rotate round-robin style)
-    const targetZone = zones[idx % zones.length];
-    
-    newCalendar.houseCleaning[targetZone].helpers.push({
-      name: item.person.name,
-      days: item.presentDays.map(d => d.slice(0, 3)) // short names e.g., lun, mar
+  if (zones.length > 0) {
+    partiallyAbsentCadets.forEach((item, idx) => {
+      // Map to a cleaning zone (rotate round-robin style)
+      const targetZone = zones[idx % zones.length];
+
+      newCalendar.houseCleaning[targetZone.id].helpers.push({
+        name: item.person.name,
+        days: item.presentDays.map(d => d.slice(0, 3)) // short names e.g., lun, mar
+      });
     });
-  });
+  }
 
   // 4. EVENING CHECK (CONTROLLO SERALE)
   // Assign one person per day from Thursday to Wednesday.
@@ -994,28 +1179,28 @@ function generateCalendar() {
     shiftList.push({ day, shift: "pomeriggio" });
   });
 
-  const recentLaundryAssignees = []; // Keep track of the last 4 assigned people (ids)
+  // Track the global shift index (0..13) at which each person was last assigned,
+  // so the "at least 2 days / 4 shifts apart" rule is enforced exactly regardless
+  // of skipped shifts (days with nobody present).
+  const lastAssignedShiftIndex = {};
+  activeCadets.forEach(c => { lastAssignedShiftIndex[c.id] = -Infinity; });
 
   const laundryLoadCounts = {};
   activeCadets.forEach(c => { laundryLoadCounts[c.id] = 0; });
+
+  const MIN_SHIFT_GAP = 4; // 4 shifts = 2 days (mattina + pomeriggio per day)
 
   shiftList.forEach((shiftObj, index) => {
     const dailyRoster = getPresentCadetsForDay(shiftObj.day);
     if (dailyRoster.length === 0) return;
 
-    // Filter candidates who are NOT in the recent list (to satisfy 4-shift interval constraint)
-    let candidates = dailyRoster.filter(c => !recentLaundryAssignees.includes(c.id));
+    // Only consider people who have gone at least MIN_SHIFT_GAP shifts without laundry duty
+    let candidates = dailyRoster.filter(c => (index - lastAssignedShiftIndex[c.id]) >= MIN_SHIFT_GAP);
 
     if (candidates.length === 0) {
-      // Fallback: If no candidate satisfies the strict rule (too few people / high absences),
-      // we pick the cadet in dailyRoster who was assigned furthest back in the recent list.
-      const rosterIds = dailyRoster.map(c => c.id);
-      // Find candidate from roster that has the minimum index in recentLaundryAssignees, or is not in it
-      dailyRoster.sort((a, b) => {
-        const idxA = recentLaundryAssignees.indexOf(a.id);
-        const idxB = recentLaundryAssignees.indexOf(b.id);
-        return idxA - idxB; // Put smaller index first (or -1 which means they are not present or were assigned longest ago)
-      });
+      // Fallback: too few people present to strictly satisfy the rule (heavy absences).
+      // Pick whoever in the roster has gone longest without a laundry shift.
+      dailyRoster.sort((a, b) => lastAssignedShiftIndex[a.id] - lastAssignedShiftIndex[b.id]);
       candidates = [dailyRoster[0]];
     }
 
@@ -1027,12 +1212,7 @@ function generateCalendar() {
     newCalendar.laundry[shiftObj.shift][shiftObj.day] = selected.name;
     laundryLoadCounts[selected.id]++;
     loadCounts[selected.id] += 1;
-
-    // Maintain recent history queue of length 4
-    recentLaundryAssignees.push(selected.id);
-    if (recentLaundryAssignees.length > 4) {
-      recentLaundryAssignees.shift();
-    }
+    lastAssignedShiftIndex[selected.id] = index;
   });
 
   // Save to State and LocalStorage

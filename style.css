@@ -867,6 +867,29 @@ body {
   fill: currentColor;
 }
 
+.action-btn-edit {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--accent-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all var(--transition-speed);
+}
+
+.action-btn-edit:hover {
+  background: var(--accent-glow);
+}
+
+.action-btn-edit svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 /* MODALS */
 .modal-overlay {
   position: fixed;

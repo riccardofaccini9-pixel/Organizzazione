@@ -208,7 +208,7 @@
           <div id="gen-step-details" class="wizard-step">
             <h3 class="card-title">Passo 2: Giorni di Assenza Specifici</h3>
             <p style="color: var(--text-muted); margin-bottom: 16px;">
-              Specifica quali giorni i cadetti selezionati saranno assenti. Se un cadetto è assente tutti i giorni (Lunedì-Domenica), verrà escluso interamente. Se è assente solo alcuni giorni, aiuterà nelle pulizie quando presente.
+              Spunta solo i giorni in cui il cadetto sarà assente (lascia deselezionati i giorni in cui sarà presente). Se un cadetto risulta assente tutti i giorni (Lunedì-Domenica), verrà escluso interamente. Se è assente solo alcuni giorni, aiuterà nelle pulizie quando presente.
             </p>
 
             <div class="table-responsive">
@@ -269,6 +269,33 @@
                 </tr>
               </thead>
               <tbody id="tasks-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 16px;">
+            <h3 class="card-title" style="margin-bottom: 0;">Zone di Pulizia</h3>
+            <div class="header-actions">
+              <button id="add-house-part-btn" class="add-btn admin-only">
+                <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                  <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                </svg>
+                Aggiungi Zona
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome Zona</th>
+                  <th class="admin-only" style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="house-parts-table-body">
                 <!-- Dynamically populated -->
               </tbody>
             </table>
@@ -381,7 +408,7 @@
   <!-- MODAL: ADD TASK -->
   <div id="modal-task" class="modal-overlay">
     <div class="modal-card">
-      <h3 class="modal-header">Aggiungi Nuova Mansione</h3>
+      <h3 id="modal-task-header" class="modal-header">Aggiungi Nuova Mansione</h3>
       
       <div class="input-group">
         <label class="input-label" for="task-name">Nome Attività</label>
@@ -416,7 +443,7 @@
   <!-- MODAL: ADD PERSON -->
   <div id="modal-person" class="modal-overlay">
     <div class="modal-card">
-      <h3 class="modal-header">Aggiungi Nuovo Utente (Cadetto)</h3>
+      <h3 id="modal-person-header" class="modal-header">Aggiungi Nuovo Utente (Cadetto)</h3>
       
       <div class="input-group">
         <label class="input-label" for="person-name">Nome</label>
@@ -444,6 +471,23 @@
       <div class="modal-actions">
         <button id="close-modal-person-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
         <button id="save-person-btn" class="btn btn-primary" style="width: auto;">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT HOUSE CLEANING ZONE -->
+  <div id="modal-house-part" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="modal-house-part-header" class="modal-header">Aggiungi Zona di Pulizia</h3>
+
+      <div class="input-group">
+        <label class="input-label" for="house-part-name">Nome Zona</label>
+        <input type="text" id="house-part-name" class="input-field" placeholder="Es. Cucina" required>
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-modal-house-part-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
+        <button id="save-house-part-btn" class="btn btn-primary" style="width: auto;">Salva</button>
       </div>
     </div>
   </div>

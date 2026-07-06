@@ -464,6 +464,45 @@ body {
   width: 200px;
 }
 
+/* SEARCH: COSA FACCIO OGGI? */
+.search-today-inputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.search-today-inputs .input-field {
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-today-results .search-today-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 12px 0 8px;
+}
+
+.search-today-results .search-today-section-title:first-child {
+  margin-top: 0;
+}
+
+.search-today-results .desc-list li {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text-main);
+}
+
+.search-today-results .desc-list li strong {
+  color: var(--accent-color);
+  text-transform: capitalize;
+}
+
 /* HOUSE CLEANING SECTION */
 .house-cleaning-grid {
   display: grid;

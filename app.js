@@ -123,6 +123,11 @@ const eveningCheckList = document.getElementById("evening-check-list");
 const laundryTableBody = document.getElementById("laundry-table-body");
 const taskExplanations = document.getElementById("task-explanations");
 
+// "Cosa faccio oggi?" search
+const searchPersonInput = document.getElementById("search-person-input");
+const searchDayInput = document.getElementById("search-day-input");
+const searchTodayResults = document.getElementById("search-today-results");
+
 // Wizard Elements
 const startWizardBtn = document.getElementById("start-wizard-btn");
 const genStepInit = document.getElementById("gen-step-init");
@@ -210,6 +215,10 @@ function init() {
 
   // Lock Toggle Button
   lockToggleBtn.addEventListener("click", toggleLock);
+
+  // "Cosa faccio oggi?" search (Enter in either field runs it)
+  searchPersonInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runTodaySearch(); });
+  searchDayInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runTodaySearch(); });
 
   // Wizard Buttons
   startWizardBtn.addEventListener("click", startWizard);
@@ -918,6 +927,100 @@ function renderCalendar() {
       taskExplanations.appendChild(li);
     });
   }
+}
+
+// "COSA FACCIO OGGI?" SEARCH
+// Filters the generated calendar by person and/or day (both optional - a
+// blank field matches everything) across every category: daily tasks,
+// evening check, laundry shifts, house cleaning zones (including helpers,
+// who only count on their specific present days) and the weekly meter
+// reading / porch cleaning duty.
+function runTodaySearch() {
+  if (!state.calendar) {
+    searchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessun calendario generato.</p>`;
+    return;
+  }
+
+  const personQuery = searchPersonInput.value.trim().toLowerCase();
+  const dayQuery = searchDayInput.value.trim().toLowerCase();
+
+  const nameMatches = (name) => !personQuery || (name && name.toLowerCase().includes(personQuery));
+  const dayMatches = (day) => !dayQuery || day.toLowerCase().startsWith(dayQuery);
+
+  // Duties that apply all week (not tied to a single day)
+  const weeklyDuties = [];
+
+  if (state.calendar.meterAssignee && nameMatches(state.calendar.meterAssignee)) {
+    weeklyDuties.push(`Lettura Contatori e Pulizia Portico — ${escapeHtml(state.calendar.meterAssignee)}`);
+  }
+
+  state.houseParts.forEach(zone => {
+    const data = state.calendar.houseCleaning[zone.id];
+    if (!data) return;
+    const assignedNames = Array.isArray(data.assigned) ? data.assigned : [];
+    assignedNames.forEach(name => {
+      if (nameMatches(name)) {
+        weeklyDuties.push(`Pulizia ${escapeHtml(zone.name)} — ${escapeHtml(name)}`);
+      }
+    });
+  });
+
+  // Duties tied to a specific day
+  const dailyResults = []; // { day, text }
+
+  DAYS_OF_WEEK.forEach(day => {
+    if (!dayMatches(day)) return;
+
+    (state.calendar.weekly[day] || []).forEach(taskInst => {
+      taskInst.assigned.forEach(name => {
+        if (nameMatches(name)) {
+          dailyResults.push({ day, text: `${escapeHtml(taskInst.name)} — ${escapeHtml(name)}` });
+        }
+      });
+    });
+
+    const eveningName = state.calendar.eveningCheck[day];
+    if (eveningName && nameMatches(eveningName)) {
+      dailyResults.push({ day, text: `Controllo Serale — ${escapeHtml(eveningName)}` });
+    }
+
+    const laundryM = state.calendar.laundry.mattina[day];
+    if (laundryM && nameMatches(laundryM)) {
+      dailyResults.push({ day, text: `Lavanderia Mattina — ${escapeHtml(laundryM)}` });
+    }
+
+    const laundryP = state.calendar.laundry.pomeriggio[day];
+    if (laundryP && nameMatches(laundryP)) {
+      dailyResults.push({ day, text: `Lavanderia Pomeriggio — ${escapeHtml(laundryP)}` });
+    }
+
+    const dayAbbrev = day.slice(0, 3);
+    state.houseParts.forEach(zone => {
+      const data = state.calendar.houseCleaning[zone.id];
+      if (!data || !data.helpers) return;
+      data.helpers.forEach(h => {
+        if (nameMatches(h.name) && h.days.includes(dayAbbrev)) {
+          dailyResults.push({ day, text: `Aiuto Pulizia ${escapeHtml(zone.name)} — ${escapeHtml(h.name)}` });
+        }
+      });
+    });
+  });
+
+  if (weeklyDuties.length === 0 && dailyResults.length === 0) {
+    searchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessuna attività trovata per i criteri inseriti.</p>`;
+    return;
+  }
+
+  let html = "";
+  if (weeklyDuties.length > 0) {
+    html += `<div class="search-today-section-title">Impegni per tutta la settimana</div>`;
+    html += `<ul class="desc-list">${weeklyDuties.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  }
+  if (dailyResults.length > 0) {
+    html += `<div class="search-today-section-title">Attività giornaliere</div>`;
+    html += `<ul class="desc-list">${dailyResults.map(r => `<li><strong>${escapeHtml(r.day)}</strong>: ${r.text}</li>`).join('')}</ul>`;
+  }
+  searchTodayResults.innerHTML = html;
 }
 
 // GENERATION WIZARD LOGIC

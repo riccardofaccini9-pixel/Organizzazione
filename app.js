@@ -1295,17 +1295,13 @@ function generateCalendar() {
 
   shiftList.forEach((shiftObj, index) => {
     const dailyRoster = getPresentCadetsForDay(shiftObj.day);
-    if (dailyRoster.length === 0) return;
+    if (dailyRoster.length === 0) return; // Leave the shift empty: nobody present
 
-    // Only consider people who have gone at least MIN_SHIFT_GAP shifts without laundry duty
-    let candidates = dailyRoster.filter(c => (index - lastAssignedShiftIndex[c.id]) >= MIN_SHIFT_GAP);
-
-    if (candidates.length === 0) {
-      // Fallback: too few people present to strictly satisfy the rule (heavy absences).
-      // Pick whoever in the roster has gone longest without a laundry shift.
-      dailyRoster.sort((a, b) => lastAssignedShiftIndex[a.id] - lastAssignedShiftIndex[b.id]);
-      candidates = [dailyRoster[0]];
-    }
+    // Only consider people who have gone at least MIN_SHIFT_GAP shifts without laundry duty.
+    // The rule is strict: if nobody qualifies, the shift is left unassigned rather than
+    // handing it to someone too soon.
+    const candidates = dailyRoster.filter(c => (index - lastAssignedShiftIndex[c.id]) >= MIN_SHIFT_GAP);
+    if (candidates.length === 0) return; // Leave the shift empty: rule can't be satisfied
 
     // Among candidates, pick the one with the lowest laundry load to balance shifts fairly
     candidates.sort((a, b) => laundryLoadCounts[a.id] - laundryLoadCounts[b.id]);

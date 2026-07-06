@@ -190,9 +190,9 @@
           <div id="gen-step-absent" class="wizard-step">
             <h3 class="card-title">Passo 1: Seleziona i Cadetti Assenti</h3>
             <p style="color: var(--text-muted); margin-bottom: 16px;">
-              Seleziona le persone che saranno assenti (parzialmente o totalmente) per questa settimana da escludere dalla normale rotazione delle mansioni.
+              Seleziona le persone che saranno assenti (parzialmente o totalmente) per questa settimana da escludere dalla normale rotazione delle mansioni. <strong>Se questa settimana sono tutti presenti, non selezionare nessuno</strong> e premi "Conferma Assenti": al passo successivo vedrai la conferma che tutti i cadetti saranno schedulati normalmente.
             </p>
-            
+
             <div id="wizard-people-list" class="people-checkbox-grid">
               <!-- Dynamically populated with people -->
             </div>
@@ -210,6 +210,8 @@
             <p style="color: var(--text-muted); margin-bottom: 16px;">
               Spunta solo i giorni in cui il cadetto sarà assente (lascia deselezionati i giorni in cui sarà presente). Se un cadetto risulta assente tutti i giorni (Lunedì-Domenica), verrà escluso interamente. Se è assente solo alcuni giorni, aiuterà nelle pulizie quando presente.
             </p>
+
+            <div id="step2-present-list" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; font-size: 14px; display: none;"></div>
 
             <div class="table-responsive">
               <table class="absence-table">

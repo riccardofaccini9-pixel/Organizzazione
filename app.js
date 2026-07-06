@@ -909,6 +909,7 @@ function resetWizard() {
   genStepAbsent.classList.remove("active");
   genStepDetails.classList.remove("active");
   wizardSelectedAbsent = [];
+  document.getElementById("step2-present-list").style.display = "none";
 }
 
 function startWizard() {
@@ -951,19 +952,28 @@ function goToStep2() {
     }
   });
 
-  if (wizardSelectedAbsent.length === 0) {
-    // No absences! We can jump directly to calendar generation or show step 2 empty.
-    // Let's proceed to Step 2 but it will have no rows, and we can directly generate.
-    // However, users might want to confirm zero absences.
-  }
-
   genStepAbsent.classList.remove("active");
   genStepDetails.classList.add("active");
+
+  // Show, explicitly, which cadets are NOT flagged as absent: they will be
+  // scheduled normally as present every day, with no further action needed.
+  const allCadets = state.people.filter(p => p.role === "cadetto");
+  const absentIds = new Set(wizardSelectedAbsent.map(p => p.id));
+  const presentCadets = allCadets.filter(p => !absentIds.has(p.id));
+  const presentListEl = document.getElementById("step2-present-list");
+
+  if (presentCadets.length > 0) {
+    presentListEl.innerHTML = `<strong>Presenti tutta la settimana (nessuna azione richiesta):</strong> ${presentCadets.map(p => escapeHtml(p.name)).join(', ')}`;
+    presentListEl.style.display = "block";
+  } else {
+    presentListEl.innerHTML = `<strong>Attenzione:</strong> tutti i cadetti sono stati selezionati come almeno parzialmente assenti al Passo 1.`;
+    presentListEl.style.display = "block";
+  }
 
   // Populate Step 2 Table
   absenceTableBody.innerHTML = "";
   if (wizardSelectedAbsent.length === 0) {
-    absenceTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Nessuna persona assente selezionata. Clicca su Genera Calendario per completare.</td></tr>`;
+    absenceTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Nessuna persona assente selezionata al Passo 1: come indicato sopra, tutti i cadetti saranno schedulati come presenti tutta la settimana. Clicca su Genera Calendario per completare.</td></tr>`;
     return;
   }
 

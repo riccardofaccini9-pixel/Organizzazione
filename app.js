@@ -972,21 +972,27 @@ function renderCalendar() {
 }
 
 // "COSA FACCIO OGGI?" SEARCH
-// Filters the generated calendar by person and/or day (both optional - a
-// blank field matches everything) across every category: daily tasks,
-// evening check, laundry shifts, house cleaning zones (including helpers,
-// who only count on their specific present days) and the weekly meter
-// reading / porch cleaning duty.
+// Requires a specific person to be selected - the full weekly calendar
+// already covers "show everyone", so results stay empty until someone is
+// chosen. The day is still optional (blank matches every day). Searches
+// across every category: daily tasks, evening check, laundry shifts, house
+// cleaning zones (including helpers, who only count on their specific
+// present days) and the weekly meter reading / porch cleaning duty.
 function runTodaySearch() {
+  const personQuery = searchPersonInput.value.trim().toLowerCase();
+  const dayQuery = searchDayInput.value.trim().toLowerCase();
+
+  if (!personQuery) {
+    searchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Seleziona una persona per vedere le sue attività (per la vista di tutti usa il Calendario Settimanale qui sotto).</p>`;
+    return;
+  }
+
   if (!state.calendar) {
     searchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessun calendario generato.</p>`;
     return;
   }
 
-  const personQuery = searchPersonInput.value.trim().toLowerCase();
-  const dayQuery = searchDayInput.value.trim().toLowerCase();
-
-  const nameMatches = (name) => !personQuery || (name && name.toLowerCase().includes(personQuery));
+  const nameMatches = (name) => name && name.toLowerCase().includes(personQuery);
   const dayMatches = (day) => !dayQuery || day.toLowerCase().startsWith(dayQuery);
 
   // Duties that apply all week (not tied to a single day)

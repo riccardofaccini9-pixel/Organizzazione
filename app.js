@@ -1278,10 +1278,8 @@ function generateCalendar() {
       // If it's a connected task, skip direct assignment
       if (task.linkedTask !== "none") return;
 
-      // The assignee group must satisfy the highest minPeople among this task
-      // and any tasks linked to it, since linked tasks share the same people.
       const linkedChildrenForMinP = sortedTasks.filter(t => t.linkedTask === task.id);
-      const minP = Math.max(task.minPeople, ...linkedChildrenForMinP.map(c => c.minPeople));
+      const minP = task.minPeople;
       const assignedCadets = [];
 
       // Select minP people from dailyRoster, prioritizing those with least daily assignments and overall load
@@ -1321,16 +1319,37 @@ function generateCalendar() {
         assigned: assignedCadets.map(c => c.name)
       });
 
-      // Assign the same people to any tasks linked to this one
+      // Assign a linked task's own required number of people, reusing as many
+      // of the parent's assignees as possible (same people doing related
+      // chores). If the linked task needs fewer people, it gets a subset of
+      // the parent's group. If it needs more, extra people are picked the
+      // same way the parent's were.
       linkedChildrenForMinP.forEach(child => {
+        const childAssigned = assignedCadets.slice(0, child.minPeople);
+
+        while (childAssigned.length < child.minPeople) {
+          const candidates = dailyRoster.filter(c => !childAssigned.includes(c));
+          if (candidates.length === 0) break;
+
+          candidates.sort((a, b) => {
+            const aToday = dailyAssignedIds.has(a.id) ? 1 : 0;
+            const bToday = dailyAssignedIds.has(b.id) ? 1 : 0;
+            if (aToday !== bToday) return aToday - bToday;
+            return loadCounts[a.id] - loadCounts[b.id];
+          });
+
+          const selected = candidates[0];
+          childAssigned.push(selected);
+          dailyAssignedIds.add(selected.id);
+        }
+
+        // Everyone actually doing this linked task picks up extra load for it
+        childAssigned.forEach(c => { loadCounts[c.id]++; });
+
         newCalendar.weekly[day].push({
           taskId: child.id,
           name: child.name,
-          assigned: assignedCadets.map(c => c.name) // Copy assignees
-        });
-        // Increment load counts for the linked tasks as well
-        assignedCadets.forEach(c => {
-          loadCounts[c.id]++;
+          assigned: childAssigned.map(c => c.name)
         });
       });
 

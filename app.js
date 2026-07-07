@@ -823,6 +823,32 @@ function saveEditedCalendarState() {
   localStorage.setItem(STORAGE_CALENDAR, JSON.stringify(state.calendar));
 }
 
+// For assignment fields that accept multiple comma-separated names (weekly
+// tasks, house cleaning zones), pairs the free-text input with a dropdown
+// of actual people: picking someone appends their name to the text field
+// instead of requiring it to be typed out by hand.
+function assigneePickerHTML(inputId) {
+  return `<select id="${inputId}-picker" class="input-field" style="margin-top: 4px; padding: 4px 8px; font-size: 12px;" onchange="addNameToAssigneeField('${inputId}', this.value)">
+    <option value="">+ Aggiungi persona...</option>
+    ${getSchedulablePeople().map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('')}
+  </select>`;
+}
+
+function addNameToAssigneeField(inputId, name) {
+  if (!name) return;
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const current = input.value.split(",").map(s => s.trim()).filter(Boolean);
+  if (!current.includes(name)) {
+    current.push(name);
+  }
+  input.value = current.join(", ");
+
+  const picker = document.getElementById(inputId + "-picker");
+  if (picker) picker.value = "";
+}
+
 function renderCalendar() {
   if (!state.calendar) return;
 
@@ -851,7 +877,8 @@ function renderCalendar() {
 
     let assigneeHTML = "";
     if (state.isUnlocked) {
-      assigneeHTML = `<input type="text" id="edit-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">`;
+      assigneeHTML = `<input type="text" id="edit-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">
+        ${assigneePickerHTML(`edit-house-${zone.id}`)}`;
     } else {
       assigneeHTML = `<span class="house-part-assignee">${escapeHtml(assignedNames.join(', ')) || 'Non assegnato'}</span>`;
     }
@@ -900,8 +927,10 @@ function renderCalendar() {
 
       let assigneeHTML = "";
       if (state.isUnlocked) {
-        // Simple text input for names so they can write multiple separated by comma
-        assigneeHTML = `<input type="text" id="edit-task-${day}-${idx}" class="day-task-assignee-edit" value="${escapeHtml(taskInst.assigned.join(', '))}" placeholder="Nomi separati da virgola">`;
+        // Text input for names (supports multiple, comma-separated) paired
+        // with a dropdown to add a person without typing their name
+        assigneeHTML = `<input type="text" id="edit-task-${day}-${idx}" class="day-task-assignee-edit" value="${escapeHtml(taskInst.assigned.join(', '))}" placeholder="Nomi separati da virgola">
+          ${assigneePickerHTML(`edit-task-${day}-${idx}`)}`;
       } else {
         assigneeHTML = `<div class="day-task-assignee">${escapeHtml(taskInst.assigned.join(', ')) || 'Non assegnato'}</div>`;
       }

@@ -139,55 +139,145 @@ const absenceTableBody = document.getElementById("absence-table-body");
 const backToStep1Btn = document.getElementById("back-to-step1-btn");
 const generateFinalBtn = document.getElementById("generate-final-btn");
 
-// LOCAL STORAGE STORAGE KEYS
-const STORAGE_PEOPLE = "clean_calendar_people";
-const STORAGE_TASKS = "clean_calendar_tasks";
-const STORAGE_HOUSE_PARTS = "clean_calendar_house_parts";
-const STORAGE_CALENDAR = "clean_calendar_current";
+// FIREBASE (shared cloud storage, so every device sees the same data)
+const firebaseConfig = {
+  apiKey: "AIzaSyDc0jnyltNmarf_jAJ9pz4DKgF07e5JB1g",
+  authDomain: "organizzatore-3219d.firebaseapp.com",
+  projectId: "organizzatore-3219d",
+  storageBucket: "organizzatore-3219d.firebasestorage.app",
+  messagingSenderId: "1065130050117",
+  appId: "1:1065130050117:web:bffef8f557ddfb3b84d92c",
+  measurementId: "G-RHWJGTJYE9"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-// LOAD INITIAL STATE
+function persistState(key, value) {
+  db.collection("appState").doc(key).set({ value })
+    .catch(err => console.error(`Errore salvataggio "${key}" su Firestore:`, err));
+}
+
+// Tracks which of the 4 documents have delivered their first snapshot, so we
+// only run the one-time app bootstrap (auto-login check) once all initial
+// data has arrived, while every snapshot after that live-refreshes the UI.
+let appBootstrapped = false;
+const pendingInitialLoads = { people: true, tasks: true, houseParts: true, calendar: true };
+
+function checkBootstrapComplete() {
+  if (appBootstrapped || Object.values(pendingInitialLoads).some(Boolean)) return;
+  appBootstrapped = true;
+  loginSubmitBtn.disabled = false;
+  loginSubmitBtn.textContent = "Accedi";
+
+  // Auto Login if session exists (using sessionStorage for temporary login state)
+  const loggedUser = sessionStorage.getItem("logged_in_user");
+  if (loggedUser) {
+    const userObj = JSON.parse(loggedUser);
+    // Refresh user object from latest state in case role changed
+    const freshUser = state.people.find(p => p.email.toLowerCase() === userObj.email.toLowerCase());
+    if (freshUser) {
+      state.currentUser = freshUser;
+      showApp();
+    } else {
+      sessionStorage.removeItem("logged_in_user");
+    }
+  }
+}
+
+// Called whenever data changes remotely (from this device or another one)
+// after the app has already booted, so every open device stays in sync.
+function refreshLiveUI() {
+  if (!state.currentUser) return; // still on the login screen
+  populateTasksTable();
+  populatePeopleTable();
+  populateHousePartsTable();
+  updateLinkedTasksDropdowns();
+  populateSearchPersonDropdown();
+  if (!state.calendar) {
+    state.calendar = createBlankCalendar();
+  }
+  renderCalendar();
+}
+
+function watchFirestoreState() {
+  db.collection("appState").doc("people").onSnapshot(snap => {
+    if (snap.exists) {
+      state.people = snap.data().value;
+    } else if (pendingInitialLoads.people) {
+      state.people = [...DEFAULT_PEOPLE];
+      persistState("people", state.people);
+    }
+    if (pendingInitialLoads.people) {
+      pendingInitialLoads.people = false;
+      checkBootstrapComplete();
+    } else {
+      refreshLiveUI();
+    }
+  }, err => console.error("Errore lettura persone da Firestore:", err));
+
+  db.collection("appState").doc("tasks").onSnapshot(snap => {
+    if (snap.exists) {
+      state.tasks = snap.data().value;
+    } else if (pendingInitialLoads.tasks) {
+      state.tasks = [...DEFAULT_TASKS];
+      persistState("tasks", state.tasks);
+    }
+    if (pendingInitialLoads.tasks) {
+      pendingInitialLoads.tasks = false;
+      checkBootstrapComplete();
+    } else {
+      refreshLiveUI();
+    }
+  }, err => console.error("Errore lettura mansioni da Firestore:", err));
+
+  db.collection("appState").doc("houseParts").onSnapshot(snap => {
+    let parts;
+    if (snap.exists) {
+      parts = snap.data().value;
+    } else if (pendingInitialLoads.houseParts) {
+      parts = [...DEFAULT_HOUSE_PARTS];
+    } else {
+      parts = state.houseParts;
+    }
+    // Migrate zones saved before minPeople/priority existed, so stale data
+    // doesn't silently break assignment (a missing minPeople stops the
+    // assignment loop from ever running).
+    state.houseParts = parts.map(zone => ({
+      id: zone.id,
+      name: zone.name,
+      minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
+      priority: (typeof zone.priority === "number") ? zone.priority : 999
+    }));
+    if (pendingInitialLoads.houseParts && !snap.exists) {
+      persistState("houseParts", state.houseParts);
+    }
+    if (pendingInitialLoads.houseParts) {
+      pendingInitialLoads.houseParts = false;
+      checkBootstrapComplete();
+    } else {
+      refreshLiveUI();
+    }
+  }, err => console.error("Errore lettura zone di pulizia da Firestore:", err));
+
+  db.collection("appState").doc("calendar").onSnapshot(snap => {
+    state.calendar = snap.exists ? snap.data().value : null;
+    if (pendingInitialLoads.calendar) {
+      pendingInitialLoads.calendar = false;
+      checkBootstrapComplete();
+    } else {
+      refreshLiveUI();
+    }
+  }, err => console.error("Errore lettura calendario da Firestore:", err));
+}
+
+// INITIAL SETUP
 function init() {
-  // Load People
-  const storedPeople = localStorage.getItem(STORAGE_PEOPLE);
-  if (storedPeople) {
-    state.people = JSON.parse(storedPeople);
-  } else {
-    state.people = [...DEFAULT_PEOPLE];
-    localStorage.setItem(STORAGE_PEOPLE, JSON.stringify(state.people));
-  }
+  // Disabled until the initial data has arrived from Firestore, so a login
+  // attempt during that brief window can't be wrongly rejected
+  loginSubmitBtn.disabled = true;
+  loginSubmitBtn.textContent = "Caricamento...";
 
-  // Load Tasks
-  const storedTasks = localStorage.getItem(STORAGE_TASKS);
-  if (storedTasks) {
-    state.tasks = JSON.parse(storedTasks);
-  } else {
-    state.tasks = [...DEFAULT_TASKS];
-    localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
-  }
-
-  // Load House Cleaning Zones
-  const storedHouseParts = localStorage.getItem(STORAGE_HOUSE_PARTS);
-  if (storedHouseParts) {
-    state.houseParts = JSON.parse(storedHouseParts);
-  } else {
-    state.houseParts = [...DEFAULT_HOUSE_PARTS];
-  }
-  // Migrate zones saved before minPeople/priority existed, so old browser
-  // data doesn't silently break assignment (a missing minPeople stops the
-  // assignment loop from ever running).
-  state.houseParts = state.houseParts.map(zone => ({
-    id: zone.id,
-    name: zone.name,
-    minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
-    priority: (typeof zone.priority === "number") ? zone.priority : 999
-  }));
-  localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
-
-  // Load Calendar
-  const storedCalendar = localStorage.getItem(STORAGE_CALENDAR);
-  if (storedCalendar) {
-    state.calendar = JSON.parse(storedCalendar);
-  }
+  watchFirestoreState();
 
   // Bind Events
   loginSubmitBtn.addEventListener("click", handleLogin);
@@ -225,20 +315,6 @@ function init() {
   confirmAbsentBtn.addEventListener("click", goToStep2);
   backToStep1Btn.addEventListener("click", goBackToStep1);
   generateFinalBtn.addEventListener("click", generateCalendar);
-
-  // Auto Login if session exists (using sessionStorage for temporary login state)
-  const loggedUser = sessionStorage.getItem("logged_in_user");
-  if (loggedUser) {
-    const userObj = JSON.parse(loggedUser);
-    // Refresh user object from latest state in case role changed
-    const freshUser = state.people.find(p => p.email.toLowerCase() === userObj.email.toLowerCase());
-    if (freshUser) {
-      state.currentUser = freshUser;
-      showApp();
-    } else {
-      sessionStorage.removeItem("logged_in_user");
-    }
-  }
 }
 
 // NAVIGATION & AUTHENTICATION
@@ -420,7 +496,7 @@ function saveTask() {
     });
   }
 
-  localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
+  persistState("tasks", state.tasks);
   editingTaskId = null;
 
   closeModal(modalTask);
@@ -437,7 +513,7 @@ function deleteTask(id) {
       t.linkedTask = "none";
     }
   });
-  localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
+  persistState("tasks", state.tasks);
   populateTasksTable();
   updateLinkedTasksDropdowns();
   renderCalendar();
@@ -456,7 +532,7 @@ function moveTask(id, direction) {
   [sorted[idx], sorted[targetIdx]] = [sorted[targetIdx], sorted[idx]];
   sorted.forEach((t, i) => { t.priority = i + 1; });
 
-  localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
+  persistState("tasks", state.tasks);
   populateTasksTable();
   renderCalendar();
 }
@@ -565,7 +641,7 @@ function savePerson() {
     });
   }
 
-  localStorage.setItem(STORAGE_PEOPLE, JSON.stringify(state.people));
+  persistState("people", state.people);
   editingPersonId = null;
 
   closeModal(modalPerson);
@@ -594,7 +670,7 @@ function deletePerson(id) {
     return;
   }
   state.people = state.people.filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_PEOPLE, JSON.stringify(state.people));
+  persistState("people", state.people);
   populatePeopleTable();
   populateSearchPersonDropdown();
 }
@@ -672,7 +748,7 @@ function saveHousePart() {
     state.houseParts.push({ id: "hp-" + Date.now(), name, minPeople, priority });
   }
 
-  localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
+  persistState("houseParts", state.houseParts);
   editingHousePartId = null;
 
   closeModal(modalHousePart);
@@ -682,7 +758,7 @@ function saveHousePart() {
 
 function deleteHousePart(id) {
   state.houseParts = state.houseParts.filter(z => z.id !== id);
-  localStorage.setItem(STORAGE_HOUSE_PARTS, JSON.stringify(state.houseParts));
+  persistState("houseParts", state.houseParts);
   populateHousePartsTable();
   renderCalendar();
 }
@@ -820,7 +896,7 @@ function saveEditedCalendarState() {
     }
   });
 
-  localStorage.setItem(STORAGE_CALENDAR, JSON.stringify(state.calendar));
+  persistState("calendar", state.calendar);
 }
 
 // For assignment fields that accept multiple comma-separated names (weekly
@@ -1539,7 +1615,7 @@ function generateCalendar() {
 
   // Save to State and LocalStorage
   state.calendar = newCalendar;
-  localStorage.setItem(STORAGE_CALENDAR, JSON.stringify(newCalendar));
+  persistState("calendar", newCalendar);
 
   // Render Visualizzazione Tab and Switch
   renderCalendar();

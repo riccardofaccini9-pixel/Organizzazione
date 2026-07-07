@@ -1258,7 +1258,10 @@ function generateCalendar() {
       // If it's a connected task, skip direct assignment
       if (task.linkedTask !== "none") return;
 
-      const minP = task.minPeople;
+      // The assignee group must satisfy the highest minPeople among this task
+      // and any tasks linked to it, since linked tasks share the same people.
+      const linkedChildrenForMinP = sortedTasks.filter(t => t.linkedTask === task.id);
+      const minP = Math.max(task.minPeople, ...linkedChildrenForMinP.map(c => c.minPeople));
       const assignedCadets = [];
 
       // Select minP people from dailyRoster, prioritizing those with least daily assignments and overall load
@@ -1298,9 +1301,8 @@ function generateCalendar() {
         assigned: assignedCadets.map(c => c.name)
       });
 
-      // Find if there are tasks linked to this task, and assign the same people
-      const linkedChildren = sortedTasks.filter(t => t.linkedTask === task.id);
-      linkedChildren.forEach(child => {
+      // Assign the same people to any tasks linked to this one
+      linkedChildrenForMinP.forEach(child => {
         newCalendar.weekly[day].push({
           taskId: child.id,
           name: child.name,

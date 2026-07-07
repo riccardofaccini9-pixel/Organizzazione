@@ -529,62 +529,67 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
 .calendar-days-container {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-  margin-bottom: 24px;
+  gap: 18px;
   align-items: stretch;
-  background: var(--border-color);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  overflow: hidden;
 }
 
 .day-column {
-  background: var(--bg-surface);
-  padding: 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 330px;
+  min-height: 320px;
 }
 
 .day-header {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   text-align: center;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-main);
+  padding: 9px 8px;
+  border-radius: 5px;
+  background: var(--accent-color);
+  color: #fff;
   text-transform: capitalize;
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
 }
 
 .day-tasks-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   flex: 1;
 }
 
 .day-task-item {
-  background: var(--bg-surface-muted);
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  padding: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 4px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border-color);
   font-size: 13px;
+  line-height: 1.4;
+}
+
+.day-task-item:last-child {
+  border-bottom: none;
 }
 
 .day-task-name {
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--text-main);
+  font-weight: 700;
+  color: var(--accent-color);
+  white-space: nowrap;
+}
+
+.day-task-name::after {
+  content: ":";
 }
 
 .day-task-assignee {
-  color: var(--accent-color);
+  color: var(--text-main);
   font-weight: 500;
 }
 
 .day-task-assignee-edit {
   width: 100%;
+  margin-top: 4px;
   background: var(--bg-surface);
   border: 1px solid var(--accent-color);
   border-radius: 4px;
@@ -592,7 +597,6 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
   font-family: inherit;
   font-size: 13px;
   padding: 3px 6px;
-  margin-top: 4px;
 }
 
 /* EVENING CHECK SECTION */

@@ -216,9 +216,9 @@ function init() {
   // Lock Toggle Button
   lockToggleBtn.addEventListener("click", toggleLock);
 
-  // "Cosa faccio oggi?" search (Enter in either field runs it)
-  searchPersonInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runTodaySearch(); });
-  searchDayInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runTodaySearch(); });
+  // "Cosa faccio oggi?" search (runs as soon as either dropdown changes)
+  searchPersonInput.addEventListener("change", runTodaySearch);
+  searchDayInput.addEventListener("change", runTodaySearch);
 
   // Wizard Buttons
   startWizardBtn.addEventListener("click", startWizard);
@@ -286,7 +286,8 @@ function showApp() {
   populatePeopleTable();
   populateHousePartsTable();
   updateLinkedTasksDropdowns();
-  
+  populateSearchPersonDropdown();
+
   if (state.calendar) {
     renderCalendar();
   } else {
@@ -338,6 +339,21 @@ function updateLinkedTasksDropdowns() {
     opt.textContent = t.name;
     taskLinkedSelect.appendChild(opt);
   });
+}
+
+function populateSearchPersonDropdown() {
+  const previousValue = searchPersonInput.value;
+  searchPersonInput.innerHTML = '<option value="">Tutte le persone</option>';
+  getSchedulablePeople().forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.name;
+    searchPersonInput.appendChild(opt);
+  });
+  // Keep the current selection if that person still exists
+  if ([...searchPersonInput.options].some(o => o.value === previousValue)) {
+    searchPersonInput.value = previousValue;
+  }
 }
 
 function openAddTaskModal() {
@@ -530,6 +546,7 @@ function savePerson() {
 
   closeModal(modalPerson);
   populatePeopleTable();
+  populateSearchPersonDropdown();
   renderCalendar(); // Assignee names showing this person may need refreshing
 }
 
@@ -555,6 +572,7 @@ function deletePerson(id) {
   state.people = state.people.filter(p => p.id !== id);
   localStorage.setItem(STORAGE_PEOPLE, JSON.stringify(state.people));
   populatePeopleTable();
+  populateSearchPersonDropdown();
 }
 
 function populatePeopleTable() {

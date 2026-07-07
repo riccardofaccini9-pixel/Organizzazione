@@ -63,11 +63,23 @@
         <div class="card">
           <h3 class="card-title">Cosa faccio oggi?</h3>
           <div class="search-today-inputs">
-            <input type="text" id="search-person-input" class="input-field" placeholder="Nome (es. Mario)">
-            <input type="text" id="search-day-input" class="input-field" placeholder="Giorno (es. giovedì)">
+            <select id="search-person-input" class="input-field">
+              <option value="">Tutte le persone</option>
+              <!-- Dynamically populated -->
+            </select>
+            <select id="search-day-input" class="input-field">
+              <option value="">Tutti i giorni</option>
+              <option value="giovedì">Giovedì</option>
+              <option value="venerdì">Venerdì</option>
+              <option value="sabato">Sabato</option>
+              <option value="domenica">Domenica</option>
+              <option value="lunedì">Lunedì</option>
+              <option value="martedì">Martedì</option>
+              <option value="mercoledì">Mercoledì</option>
+            </select>
           </div>
           <div id="search-today-results" class="search-today-results">
-            <p style="color: var(--text-muted); font-size: 14px;">Inserisci un nome e/o un giorno e premi Invio.</p>
+            <p style="color: var(--text-muted); font-size: 14px;">Scegli una persona e/o un giorno.</p>
           </div>
         </div>
 
@@ -92,7 +104,9 @@
         </div>
 
         <!-- WEEKLY CALENDAR -->
-        <div id="weekly-calendar-container" class="calendar-days-container">
+        <div class="card">
+          <h3 class="card-title">Calendario Settimanale</h3>
+          <div id="weekly-calendar-container" class="calendar-days-container">
           <!-- Columns for Thursday to Wednesday -->
           <div class="day-column" data-day="giovedì">
             <div class="day-header">giovedì</div>
@@ -121,6 +135,7 @@
           <div class="day-column" data-day="mercoledì">
             <div class="day-header">mercoledì</div>
             <div class="day-tasks-list"></div>
+          </div>
           </div>
         </div>
 

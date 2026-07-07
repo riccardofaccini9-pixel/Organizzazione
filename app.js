@@ -875,18 +875,13 @@ function renderCalendar() {
 
   // RENDER WEEKLY CALENDAR DAYS
   // Keep each day's task order in sync with the current priority set in
-  // Gestione Mansioni, rather than the order they happened to be in when
-  // the calendar was generated. A linked (child) task sorts right after
-  // its parent regardless of its own priority, matching how they were
-  // grouped at generation time. Sorting the array in place (not a copy)
-  // keeps it aligned with the "edit-task-{day}-{idx}" ids used when saving
-  // manual edits.
-  function taskSortKey(taskId) {
+  // Gestione Mansioni (same order shown in that table), rather than the
+  // order they happened to be in when the calendar was generated. Sorting
+  // the array in place (not a copy) keeps it aligned with the
+  // "edit-task-{day}-{idx}" ids used when saving manual edits.
+  function taskPriority(taskId) {
     const task = state.tasks.find(t => t.id === taskId);
-    if (!task) return [999, 0];
-    if (task.linkedTask === "none") return [task.priority, 0];
-    const parent = state.tasks.find(t => t.id === task.linkedTask);
-    return [parent ? parent.priority : task.priority, 1];
+    return task ? task.priority : 999;
   }
 
   DAYS_OF_WEEK.forEach(day => {
@@ -895,11 +890,7 @@ function renderCalendar() {
     list.innerHTML = "";
 
     if (state.calendar.weekly[day]) {
-      state.calendar.weekly[day].sort((a, b) => {
-        const [aPriority, aSub] = taskSortKey(a.taskId);
-        const [bPriority, bSub] = taskSortKey(b.taskId);
-        return aPriority !== bPriority ? aPriority - bPriority : aSub - bSub;
-      });
+      state.calendar.weekly[day].sort((a, b) => taskPriority(a.taskId) - taskPriority(b.taskId));
     }
 
     const dayTasks = state.calendar.weekly[day] || [];

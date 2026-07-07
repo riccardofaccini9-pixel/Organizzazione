@@ -913,6 +913,13 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
   fill: currentColor;
 }
 
+.action-btn-edit:disabled,
+.action-btn-danger:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
 /* MODALS */
 .modal-overlay {
   position: fixed;

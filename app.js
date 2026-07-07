@@ -443,21 +443,45 @@ function deleteTask(id) {
   renderCalendar();
 }
 
+// Moves a task up (direction -1) or down (direction +1) in the priority
+// order shown in Visualizzazione. Re-numbers every task's priority to a
+// clean 1..N sequence matching the new order, so the move always works
+// even if several tasks previously shared the same priority value.
+function moveTask(id, direction) {
+  const sorted = [...state.tasks].sort((a, b) => a.priority - b.priority);
+  const idx = sorted.findIndex(t => t.id === id);
+  const targetIdx = idx + direction;
+  if (idx === -1 || targetIdx < 0 || targetIdx >= sorted.length) return;
+
+  [sorted[idx], sorted[targetIdx]] = [sorted[targetIdx], sorted[idx]];
+  sorted.forEach((t, i) => { t.priority = i + 1; });
+
+  localStorage.setItem(STORAGE_TASKS, JSON.stringify(state.tasks));
+  populateTasksTable();
+  renderCalendar();
+}
+
 function populateTasksTable() {
   tasksTableBody.innerHTML = "";
   // Sort tasks by priority
   const sorted = [...state.tasks].sort((a, b) => a.priority - b.priority);
 
-  sorted.forEach(t => {
+  sorted.forEach((t, idx) => {
     const linked = state.tasks.find(lt => lt.id === t.linkedTask);
     const linkedName = linked ? linked.name : "Nessuna";
     const tr = document.createElement("tr");
 
     const actionBtns = state.currentUser.role === "admin"
-      ? `<button class="action-btn-edit" onclick="editTask('${t.id}')">
+      ? `<button class="action-btn-edit" onclick="moveTask('${t.id}', -1)" ${idx === 0 ? 'disabled' : ''} title="Sposta su">
+          <svg viewBox="0 0 24 24"><path d="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"/></svg>
+         </button>
+         <button class="action-btn-edit" onclick="moveTask('${t.id}', 1)" ${idx === sorted.length - 1 ? 'disabled' : ''} title="Sposta giù">
+          <svg viewBox="0 0 24 24"><path d="M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z"/></svg>
+         </button>
+         <button class="action-btn-edit" onclick="editTask('${t.id}')" title="Modifica">
           <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
          </button>
-         <button class="action-btn-danger" onclick="deleteTask('${t.id}')">
+         <button class="action-btn-danger" onclick="deleteTask('${t.id}')" title="Elimina">
           <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
          </button>`
       : "";
@@ -467,7 +491,7 @@ function populateTasksTable() {
       <td>${t.minPeople}</td>
       <td>${t.priority}</td>
       <td><span style="color: var(--accent-color);">${escapeHtml(linkedName)}</span></td>
-      ${state.currentUser.role === 'admin' ? `<td style="text-align: center;">${actionBtns}</td>` : ''}
+      ${state.currentUser.role === 'admin' ? `<td style="text-align: center; white-space: nowrap;">${actionBtns}</td>` : ''}
     `;
     tasksTableBody.appendChild(tr);
   });
@@ -933,7 +957,7 @@ function renderCalendar() {
   if (state.tasks.length === 0) {
     taskExplanations.innerHTML = "<li>Nessuna mansione configurata.</li>";
   } else {
-    state.tasks.forEach(t => {
+    [...state.tasks].sort((a, b) => a.priority - b.priority).forEach(t => {
       const li = document.createElement("li");
       if (t.description && t.description.trim()) {
         li.innerHTML = `<strong>${escapeHtml(t.name)}</strong>: ${escapeHtml(t.description)}`;

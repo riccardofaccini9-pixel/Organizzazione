@@ -62,6 +62,7 @@ const loginEmailInput = document.getElementById("login-email");
 const loginPasswordInput = document.getElementById("login-password");
 const loginSubmitBtn = document.getElementById("login-submit-btn");
 const loginError = document.getElementById("login-error");
+const migrateDataBtn = document.getElementById("migrate-data-btn");
 
 const navItems = document.querySelectorAll(".nav-item");
 const tabContents = document.querySelectorAll(".tab-content");
@@ -155,6 +156,41 @@ const db = firebase.firestore();
 function persistState(key, value) {
   db.collection("appState").doc(key).set({ value })
     .catch(err => console.error(`Errore salvataggio "${key}" su Firestore:`, err));
+}
+
+// ONE-TIME MIGRATION: browsers that used this site before the switch to
+// Firestore still have their data in localStorage under these old keys.
+// Offer to copy it into the shared cloud database instead of silently
+// losing it in favor of the fresh defaults Firestore seeds itself with.
+const LEGACY_STORAGE_KEYS = {
+  people: "clean_calendar_people",
+  tasks: "clean_calendar_tasks",
+  houseParts: "clean_calendar_house_parts",
+  calendar: "clean_calendar_current"
+};
+
+function checkForLocalMigration() {
+  const hasOldData = Object.values(LEGACY_STORAGE_KEYS).some(key => localStorage.getItem(key));
+  if (hasOldData) {
+    migrateDataBtn.style.display = "block";
+  }
+}
+
+function migrateLocalDataToFirestore() {
+  const confirmed = confirm(
+    "Questo sovrascriverà i dati condivisi nel cloud (persone, mansioni, zone di pulizia, calendario) con quelli salvati in questo browser. Procedere?"
+  );
+  if (!confirmed) return;
+
+  Object.entries(LEGACY_STORAGE_KEYS).forEach(([firestoreKey, localKey]) => {
+    const raw = localStorage.getItem(localKey);
+    if (raw) {
+      persistState(firestoreKey, JSON.parse(raw));
+    }
+  });
+
+  migrateDataBtn.style.display = "none";
+  alert("Dati migrati al cloud. Il sito si aggiornerà a breve con questi dati su tutti i dispositivi.");
 }
 
 // Tracks which of the 4 documents have delivered their first snapshot, so we
@@ -272,6 +308,9 @@ function watchFirestoreState() {
 
 // INITIAL SETUP
 function init() {
+  checkForLocalMigration();
+  migrateDataBtn.addEventListener("click", migrateLocalDataToFirestore);
+
   // Disabled until the initial data has arrived from Firestore, so a login
   // attempt during that brief window can't be wrongly rejected
   loginSubmitBtn.disabled = true;

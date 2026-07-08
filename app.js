@@ -1416,11 +1416,21 @@ function generateCalendar() {
     // Track assigned people on this day to avoid assigning same person to same/multiple tasks on same day if avoidable
     const dailyAssignedIds = new Set();
 
+    // Tasks sharing the same priority are treated as happening "at once", so
+    // the same person can't be put on two of them the same day. Tracked per
+    // priority value, reset each day.
+    const dailyAssignedByPriority = {};
+
     // Separate primary tasks and connected tasks
     // Connected tasks copy assignees from their parent task
     sortedTasks.forEach(task => {
       // If it's a connected task, skip direct assignment
       if (task.linkedTask !== "none") return;
+
+      if (!dailyAssignedByPriority[task.priority]) {
+        dailyAssignedByPriority[task.priority] = new Set();
+      }
+      const usedForThisPriority = dailyAssignedByPriority[task.priority];
 
       const linkedChildrenForMinP = sortedTasks.filter(t => t.linkedTask === task.id);
       const minP = task.minPeople;
@@ -1428,8 +1438,14 @@ function generateCalendar() {
 
       // Select minP people from dailyRoster, prioritizing those with least daily assignments and overall load
       for (let i = 0; i < minP; i++) {
-        // Filter out people already assigned to THIS task
-        let candidates = dailyRoster.filter(c => !assignedCadets.includes(c));
+        // Filter out people already assigned to THIS task, and (hard rule)
+        // anyone already assigned today to another task with the same
+        // priority - unless that leaves nobody to pick, in which case the
+        // rule is relaxed rather than leaving the task unfilled.
+        let candidates = dailyRoster.filter(c => !assignedCadets.includes(c) && !usedForThisPriority.has(c.id));
+        if (candidates.length === 0) {
+          candidates = dailyRoster.filter(c => !assignedCadets.includes(c));
+        }
 
         if (candidates.length === 0) break;
 
@@ -1452,6 +1468,7 @@ function generateCalendar() {
         const selected = candidates[0];
         assignedCadets.push(selected);
         dailyAssignedIds.add(selected.id);
+        usedForThisPriority.add(selected.id);
         taskAssignmentCounts[task.id][selected.id]++;
         loadCounts[selected.id]++;
       }

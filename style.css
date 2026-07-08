@@ -42,11 +42,11 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
 .login-container {
   display: flex;
   justify-content: flex-start;
-  align-items: flex-start;
+  align-items: center;
   width: 100vw;
   height: 100vh;
   padding: 40px;
-  background-color: var(--bg-page);
+  background-color: #000;
   background-image: url('images/loginBackground.jpg');
   background-size: contain;
   background-position: center;

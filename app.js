@@ -49,7 +49,7 @@ const DEFAULT_HOUSE_PARTS = [
   { id: "hp5", name: "Scale & Vetrate", minPeople: 1, priority: 5 }
 ];
 
-const DAYS_OF_WEEK = ["giovedì", "venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì"];
+const DAYS_OF_WEEK = ["venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì", "giovedì"];
 const WIZARD_DAYS = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
 
 // WIZARD STATE
@@ -1573,7 +1573,7 @@ function generateCalendar() {
   }
 
   // 4. EVENING CHECK (CONTROLLO SERALE)
-  // Assign one person per day from Thursday to Wednesday. Track the day each
+  // Assign one person per day from Friday to Thursday. Track the day each
   // person last did the evening check so the same person can't be picked on
   // consecutive days (the previous version only nudged loadCounts by 0.5,
   // too small to stop someone with an otherwise-low load from being reused
@@ -1608,7 +1608,7 @@ function generateCalendar() {
   // 5. LAUNDRY TABLE (LAVANDERIA)
   // Rotate assignments for morning/afternoon shifts.
   // Rule: Laundry table must not repeat names before 2 days or 4 shifts.
-  // There are 14 shifts sequentially: (Thur-M, Thur-P, Fri-M, Fri-P, Sat-M, Sat-P, Sun-M, Sun-P, Mon-M, Mon-P, Tue-M, Tue-P, Wed-M, Wed-P)
+  // There are 14 shifts sequentially: (Fri-M, Fri-P, Sat-M, Sat-P, Sun-M, Sun-P, Mon-M, Mon-P, Tue-M, Tue-P, Wed-M, Wed-P, Thur-M, Thur-P)
   const shiftList = [];
   DAYS_OF_WEEK.forEach(day => {
     shiftList.push({ day, shift: "mattina" });

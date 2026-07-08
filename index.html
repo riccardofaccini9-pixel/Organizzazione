@@ -111,11 +111,7 @@
         <div class="card">
           <h3 class="card-title">Calendario Settimanale</h3>
           <div id="weekly-calendar-container" class="calendar-days-container">
-          <!-- Columns for Thursday to Wednesday -->
-          <div class="day-column" data-day="giovedì">
-            <div class="day-header">giovedì</div>
-            <div class="day-tasks-list"></div>
-          </div>
+          <!-- Columns for Friday to Thursday -->
           <div class="day-column" data-day="venerdì">
             <div class="day-header">venerdì</div>
             <div class="day-tasks-list"></div>
@@ -140,6 +136,10 @@
             <div class="day-header">mercoledì</div>
             <div class="day-tasks-list"></div>
           </div>
+          <div class="day-column" data-day="giovedì">
+            <div class="day-header">giovedì</div>
+            <div class="day-tasks-list"></div>
+          </div>
           </div>
         </div>
 
@@ -159,37 +159,37 @@
               <thead>
                 <tr id="laundry-days-header">
                   <th>Turno</th>
-                  <th>giovedì</th>
                   <th>venerdì</th>
                   <th>sabato</th>
                   <th>domenica</th>
                   <th>lunedì</th>
                   <th>martedì</th>
                   <th>mercoledì</th>
+                  <th>giovedì</th>
                 </tr>
               </thead>
               <tbody id="laundry-table-body">
                 <tr data-shift="mattina">
                   <td class="laundry-shift-label">Mattina</td>
                   <!-- Tds populated dynamically -->
-                  <td data-day="giovedì">-</td>
                   <td data-day="venerdì">-</td>
                   <td data-day="sabato">-</td>
                   <td data-day="domenica">-</td>
                   <td data-day="lunedì">-</td>
                   <td data-day="martedì">-</td>
                   <td data-day="mercoledì">-</td>
+                  <td data-day="giovedì">-</td>
                 </tr>
                 <tr data-shift="pomeriggio">
                   <td class="laundry-shift-label">Pomeriggio</td>
                   <!-- Tds populated dynamically -->
-                  <td data-day="giovedì">-</td>
                   <td data-day="venerdì">-</td>
                   <td data-day="sabato">-</td>
                   <td data-day="domenica">-</td>
                   <td data-day="lunedì">-</td>
                   <td data-day="martedì">-</td>
                   <td data-day="mercoledì">-</td>
+                  <td data-day="giovedì">-</td>
                 </tr>
               </tbody>
             </table>

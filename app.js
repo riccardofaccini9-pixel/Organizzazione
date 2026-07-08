@@ -321,7 +321,8 @@ function init() {
   // Bind Events
   loginSubmitBtn.addEventListener("click", handleLogin);
   logoutBtn.addEventListener("click", handleLogout);
-  
+  loginEmailInput.addEventListener("input", updateLoginBackground);
+
   navItems.forEach(item => {
     item.addEventListener("click", () => {
       const tabId = item.getAttribute("data-tab");
@@ -356,6 +357,24 @@ function init() {
   generateFinalBtn.addEventListener("click", generateCalendar);
 }
 
+// LOGIN BACKGROUND EASTER EGG
+// As the email field is typed, the login page background progressively
+// changes through 3 images tied to one specific account. Checked longest
+// (most specific) match first so the full-email stage wins over the shorter
+// prefixes once reached.
+function updateLoginBackground() {
+  const value = loginEmailInput.value.trim().toLowerCase();
+  loginView.classList.remove("login-bg-stage-1", "login-bg-stage-2", "login-bg-stage-3");
+
+  if (value === "robertbaciu967@gmail.com") {
+    loginView.classList.add("login-bg-stage-3");
+  } else if (value.startsWith("robert")) {
+    loginView.classList.add("login-bg-stage-2");
+  } else if (value.startsWith("ro")) {
+    loginView.classList.add("login-bg-stage-1");
+  }
+}
+
 // NAVIGATION & AUTHENTICATION
 function handleLogin() {
   const email = loginEmailInput.value.trim().toLowerCase();
@@ -371,6 +390,7 @@ function handleLogin() {
     loginError.style.display = "none";
     loginEmailInput.value = "";
     loginPasswordInput.value = "";
+    loginView.classList.remove("login-bg-stage-1", "login-bg-stage-2", "login-bg-stage-3");
     showApp();
   } else {
     loginError.style.display = "block";

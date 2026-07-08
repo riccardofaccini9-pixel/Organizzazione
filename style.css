@@ -46,6 +46,21 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
   width: 100vw;
   height: 100vh;
   padding: 20px;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 0.4s ease;
+}
+
+.login-container.login-bg-stage-1 {
+  background-image: url('images/login-bg-1.jpg');
+}
+
+.login-container.login-bg-stage-2 {
+  background-image: url('images/login-bg-2.jpg');
+}
+
+.login-container.login-bg-stage-3 {
+  background-image: url('images/login-bg-3.jpg');
 }
 
 .login-card {

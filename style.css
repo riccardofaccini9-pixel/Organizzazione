@@ -41,14 +41,15 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
 /* LOGIN VIEW */
 .login-container {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start;
+  align-items: flex-start;
   width: 100vw;
   height: 100vh;
-  padding: 20px;
+  padding: 40px;
   background-image: url('images/loginBackground.jpg');
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   transition: background-image 0.4s ease;
 }
 

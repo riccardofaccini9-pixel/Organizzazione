@@ -46,8 +46,9 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
   width: 100vw;
   height: 100vh;
   padding: 40px;
+  background-color: var(--bg-page);
   background-image: url('images/loginBackground.jpg');
-  background-size: cover;
+  background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
   transition: background-image 0.4s ease;

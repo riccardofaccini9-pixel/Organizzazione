@@ -187,6 +187,9 @@ function migrateLocalDataToFirestore() {
     if (raw) {
       persistState(firestoreKey, JSON.parse(raw));
     }
+    // Remove the legacy key so this migration can't accidentally run again
+    // later and clobber newer cloud data with this old local snapshot.
+    localStorage.removeItem(localKey);
   });
 
   migrateDataBtn.style.display = "none";

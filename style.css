@@ -546,7 +546,7 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
 /* WEEKLY CALENDAR GRID */
 .calendar-days-container {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 18px;
   align-items: stretch;
 }
@@ -555,6 +555,7 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
   display: flex;
   flex-direction: column;
   min-height: 320px;
+  min-width: 0;
 }
 
 .day-header {
@@ -593,7 +594,6 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
 .day-task-name {
   font-weight: 700;
   color: var(--accent-color);
-  white-space: nowrap;
 }
 
 .day-task-name::after {

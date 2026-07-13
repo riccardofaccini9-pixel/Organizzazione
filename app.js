@@ -62,6 +62,7 @@ const loginEmailInput = document.getElementById("login-email");
 const loginPasswordInput = document.getElementById("login-password");
 const loginSubmitBtn = document.getElementById("login-submit-btn");
 const loginError = document.getElementById("login-error");
+const loginConnectionWarning = document.getElementById("login-connection-warning");
 const migrateDataBtn = document.getElementById("migrate-data-btn");
 
 const navItems = document.querySelectorAll(".nav-item");
@@ -202,11 +203,30 @@ function migrateLocalDataToFirestore() {
 let appBootstrapped = false;
 const pendingInitialLoads = { people: true, tasks: true, houseParts: true, calendar: true };
 
+let hadFirestoreLoadError = false;
+
+// Shared handler for Firestore read errors (e.g. blocked/unreachable network):
+// surfaces a visible warning instead of failing silently, and - if this
+// document was still part of the initial load - unblocks the login button
+// anyway rather than leaving it stuck on "Caricamento..." forever.
+function handleFirestoreError(key, err) {
+  console.error(`Errore lettura "${key}" da Firestore:`, err);
+  hadFirestoreLoadError = true;
+  loginConnectionWarning.style.display = "block";
+  if (pendingInitialLoads[key]) {
+    pendingInitialLoads[key] = false;
+    checkBootstrapComplete();
+  }
+}
+
 function checkBootstrapComplete() {
   if (appBootstrapped || Object.values(pendingInitialLoads).some(Boolean)) return;
   appBootstrapped = true;
   loginSubmitBtn.disabled = false;
   loginSubmitBtn.textContent = "Accedi";
+  if (!hadFirestoreLoadError) {
+    loginConnectionWarning.style.display = "none";
+  }
 
   // Auto Login if session exists (using sessionStorage for temporary login state)
   const loggedUser = sessionStorage.getItem("logged_in_user");
@@ -252,7 +272,7 @@ function watchFirestoreState() {
     } else {
       refreshLiveUI();
     }
-  }, err => console.error("Errore lettura persone da Firestore:", err));
+  }, err => handleFirestoreError("people", err));
 
   db.collection("appState").doc("tasks").onSnapshot(snap => {
     if (snap.exists) {
@@ -267,7 +287,7 @@ function watchFirestoreState() {
     } else {
       refreshLiveUI();
     }
-  }, err => console.error("Errore lettura mansioni da Firestore:", err));
+  }, err => handleFirestoreError("tasks", err));
 
   db.collection("appState").doc("houseParts").onSnapshot(snap => {
     let parts;
@@ -296,7 +316,7 @@ function watchFirestoreState() {
     } else {
       refreshLiveUI();
     }
-  }, err => console.error("Errore lettura zone di pulizia da Firestore:", err));
+  }, err => handleFirestoreError("houseParts", err));
 
   db.collection("appState").doc("calendar").onSnapshot(snap => {
     state.calendar = snap.exists ? snap.data().value : null;
@@ -306,7 +326,7 @@ function watchFirestoreState() {
     } else {
       refreshLiveUI();
     }
-  }, err => console.error("Errore lettura calendario da Firestore:", err));
+  }, err => handleFirestoreError("calendar", err));
 }
 
 // INITIAL SETUP
@@ -320,6 +340,22 @@ function init() {
   loginSubmitBtn.textContent = "Caricamento...";
 
   watchFirestoreState();
+
+  // Safety net: if Firestore never responds at all (success or error - e.g.
+  // a network that silently blocks the connection), don't leave the login
+  // button stuck on "Caricamento..." forever. Falls back to local defaults
+  // for whatever didn't load, which at least lets ADMIN/ADMIN in for
+  // troubleshooting.
+  setTimeout(() => {
+    if (appBootstrapped) return;
+    hadFirestoreLoadError = true;
+    loginConnectionWarning.style.display = "block";
+    if (pendingInitialLoads.people) { state.people = [...DEFAULT_PEOPLE]; pendingInitialLoads.people = false; }
+    if (pendingInitialLoads.tasks) { state.tasks = [...DEFAULT_TASKS]; pendingInitialLoads.tasks = false; }
+    if (pendingInitialLoads.houseParts) { state.houseParts = [...DEFAULT_HOUSE_PARTS]; pendingInitialLoads.houseParts = false; }
+    pendingInitialLoads.calendar = false;
+    checkBootstrapComplete();
+  }, 8000);
 
   // Bind Events
   loginSubmitBtn.addEventListener("click", handleLogin);
@@ -381,10 +417,13 @@ function updateLoginBackground() {
 // NAVIGATION & AUTHENTICATION
 function handleLogin() {
   const email = loginEmailInput.value.trim().toLowerCase();
-  const password = loginPasswordInput.value;
+  const password = loginPasswordInput.value.trim();
 
+  // Trim the stored password too: a stray space accidentally saved via the
+  // Gestione Persone form (easy to introduce on mobile keyboards) shouldn't
+  // permanently lock someone out.
   const foundUser = state.people.find(
-    p => p.email.toLowerCase() === email && p.password === password
+    p => p.email.trim().toLowerCase() === email && p.password.trim() === password
   );
 
   if (foundUser) {
@@ -661,7 +700,7 @@ function editPerson(id) {
 function savePerson() {
   const name = personNameInput.value.trim();
   const email = personEmailInput.value.trim();
-  const password = personPasswordInput.value;
+  const password = personPasswordInput.value.trim();
   const role = personRoleSelect.value;
 
   if (!name || !email || !password) {

@@ -20,7 +20,7 @@
       
       <div class="input-group">
         <label class="input-label" for="login-email">Email</label>
-        <input type="email" id="login-email" class="input-field" placeholder="esempio@mail.com" required>
+        <input type="email" id="login-email" class="input-field" placeholder="esempio@mail.com" autocapitalize="off" autocorrect="off" spellcheck="false" required>
       </div>
       
       <div class="input-group">
@@ -33,6 +33,9 @@
       </button>
       
       <div id="login-error" class="error-message">Credenziali non valide</div>
+      <div id="login-connection-warning" class="error-message" style="display: none; color: var(--warning-color);">
+        Connessione al database lenta o non riuscita. Puoi comunque provare ad accedere, ma i dati potrebbero non essere aggiornati. Controlla la connessione e ricarica la pagina.
+      </div>
 
       <button id="migrate-data-btn" class="btn btn-secondary" style="display: none; margin-top: 16px; font-size: 13px;">
         Trovati dati salvati su questo dispositivo: migra al cloud

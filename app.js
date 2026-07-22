@@ -84,6 +84,7 @@ const taskMinPeopleInput = document.getElementById("task-min-people");
 const taskPriorityInput = document.getElementById("task-priority");
 const taskLinkedSelect = document.getElementById("task-linked");
 const taskDescriptionInput = document.getElementById("task-description");
+const taskExclusiveInput = document.getElementById("task-exclusive");
 const saveTaskBtn = document.getElementById("save-task-btn");
 const closeTaskModalBtn = document.getElementById("close-modal-task-btn");
 const addTaskBtn = document.getElementById("add-task-btn");
@@ -501,6 +502,7 @@ function openAddTaskModal() {
   taskMinPeopleInput.value = "1";
   taskPriorityInput.value = "";
   taskDescriptionInput.value = "";
+  taskExclusiveInput.checked = false;
   updateLinkedTasksDropdowns();
   taskLinkedSelect.value = "none";
   openModal(modalTask);
@@ -516,6 +518,7 @@ function editTask(id) {
   taskMinPeopleInput.value = task.minPeople;
   taskPriorityInput.value = task.priority;
   taskDescriptionInput.value = task.description || "";
+  taskExclusiveInput.checked = !!task.exclusive;
   updateLinkedTasksDropdowns();
   taskLinkedSelect.value = task.linkedTask;
   openModal(modalTask);
@@ -527,6 +530,7 @@ function saveTask() {
   const rawPriority = taskPriorityInput.value.trim();
   const linkedTask = taskLinkedSelect.value;
   const description = taskDescriptionInput.value.trim();
+  const exclusive = taskExclusiveInput.checked;
 
   if (!name) {
     alert("Inserire il nome della mansione!");
@@ -547,6 +551,7 @@ function saveTask() {
     task.priority = priority;
     task.linkedTask = linkedTask === editingTaskId ? "none" : linkedTask;
     task.description = description;
+    task.exclusive = exclusive;
   } else {
     state.tasks.push({
       id: "task-" + Date.now(),
@@ -554,7 +559,8 @@ function saveTask() {
       minPeople,
       priority,
       linkedTask,
-      description
+      description,
+      exclusive
     });
   }
 
@@ -625,7 +631,7 @@ function populateTasksTable() {
       : "";
 
     tr.innerHTML = `
-      <td><strong>${escapeHtml(t.name)}</strong></td>
+      <td><strong>${escapeHtml(t.name)}</strong>${t.exclusive ? ' <span class="badge badge-admin" title="Chi la svolge non fa altro lo stesso giorno">Esclusiva</span>' : ''}</td>
       <td>${t.minPeople}</td>
       <td>${t.priority}</td>
       <td><span style="color: var(--accent-color);">${escapeHtml(linkedName)}</span></td>
@@ -1439,6 +1445,11 @@ function generateCalendar() {
     // Track assigned people on this day to avoid assigning same person to same/multiple tasks on same day if avoidable
     const dailyAssignedIds = new Set();
 
+    // People assigned to an "exclusive" task (e.g. cooking) today: excluded
+    // outright from every other independent task the same day, unlike the
+    // soft same-day preference above.
+    const dailyHardExcluded = new Set();
+
     // Tasks sharing the same priority are treated as happening "at once", so
     // the same person can't be put on two of them the same day. Tracked per
     // priority value, reset each day.
@@ -1461,13 +1472,14 @@ function generateCalendar() {
 
       // Select minP people from dailyRoster, prioritizing those with least daily assignments and overall load
       for (let i = 0; i < minP; i++) {
-        // Filter out people already assigned to THIS task, and (hard rule)
-        // anyone already assigned today to another task with the same
-        // priority - unless that leaves nobody to pick, in which case the
-        // rule is relaxed rather than leaving the task unfilled.
-        let candidates = dailyRoster.filter(c => !assignedCadets.includes(c) && !usedForThisPriority.has(c.id));
+        // Filter out people already assigned to THIS task, anyone hard-excluded
+        // (e.g. already cooking), and (soft-but-preferred rule) anyone already
+        // assigned today to another task with the same priority - unless that
+        // leaves nobody to pick, in which case the priority rule is relaxed
+        // rather than leaving the task unfilled. The hard exclusion never relaxes.
+        let candidates = dailyRoster.filter(c => !assignedCadets.includes(c) && !dailyHardExcluded.has(c.id) && !usedForThisPriority.has(c.id));
         if (candidates.length === 0) {
-          candidates = dailyRoster.filter(c => !assignedCadets.includes(c));
+          candidates = dailyRoster.filter(c => !assignedCadets.includes(c) && !dailyHardExcluded.has(c.id));
         }
 
         if (candidates.length === 0) break;
@@ -1496,6 +1508,11 @@ function generateCalendar() {
         loadCounts[selected.id]++;
       }
 
+      // An "exclusive" task's assignees can't be put on anything else today
+      if (task.exclusive) {
+        assignedCadets.forEach(c => dailyHardExcluded.add(c.id));
+      }
+
       // Add task instance to calendar day
       newCalendar.weekly[day].push({
         taskId: task.id,
@@ -1503,16 +1520,21 @@ function generateCalendar() {
         assigned: assignedCadets.map(c => c.name)
       });
 
-      // Assign a linked task's own required number of people, reusing as many
-      // of the parent's assignees as possible (same people doing related
-      // chores). If the linked task needs fewer people, it gets a subset of
-      // the parent's group. If it needs more, extra people are picked the
-      // same way the parent's were.
+      // Assign each linked task its own required number of people, reusing as
+      // many of the parent's assignees as possible (same people doing related
+      // chores). A running pointer into the parent's group is shared across
+      // sibling linked tasks, so e.g. with 2 people cooking-helpers and two
+      // linked tasks needing 1 each, the first claims helper #1 and the
+      // second gets helper #2 - not the same one twice. If a linked task
+      // needs more people than remain in the parent's group, the rest are
+      // topped up the same way the parent's were.
+      let parentPoolPointer = 0;
       linkedChildrenForMinP.forEach(child => {
-        const childAssigned = assignedCadets.slice(0, child.minPeople);
+        const childAssigned = assignedCadets.slice(parentPoolPointer, parentPoolPointer + child.minPeople);
+        parentPoolPointer += childAssigned.length;
 
         while (childAssigned.length < child.minPeople) {
-          const candidates = dailyRoster.filter(c => !childAssigned.includes(c));
+          const candidates = dailyRoster.filter(c => !childAssigned.includes(c) && !dailyHardExcluded.has(c.id));
           if (candidates.length === 0) break;
 
           candidates.sort((a, b) => {
@@ -1525,6 +1547,10 @@ function generateCalendar() {
           const selected = candidates[0];
           childAssigned.push(selected);
           dailyAssignedIds.add(selected.id);
+        }
+
+        if (child.exclusive) {
+          childAssigned.forEach(c => dailyHardExcluded.add(c.id));
         }
 
         // Everyone actually doing this linked task picks up extra load for it

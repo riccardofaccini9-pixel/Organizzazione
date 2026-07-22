@@ -63,7 +63,6 @@ const loginPasswordInput = document.getElementById("login-password");
 const loginSubmitBtn = document.getElementById("login-submit-btn");
 const loginError = document.getElementById("login-error");
 const loginConnectionWarning = document.getElementById("login-connection-warning");
-const migrateDataBtn = document.getElementById("migrate-data-btn");
 
 const navItems = document.querySelectorAll(".nav-item");
 const tabContents = document.querySelectorAll(".tab-content");
@@ -157,44 +156,6 @@ const db = firebase.firestore();
 function persistState(key, value) {
   db.collection("appState").doc(key).set({ value })
     .catch(err => console.error(`Errore salvataggio "${key}" su Firestore:`, err));
-}
-
-// ONE-TIME MIGRATION: browsers that used this site before the switch to
-// Firestore still have their data in localStorage under these old keys.
-// Offer to copy it into the shared cloud database instead of silently
-// losing it in favor of the fresh defaults Firestore seeds itself with.
-const LEGACY_STORAGE_KEYS = {
-  people: "clean_calendar_people",
-  tasks: "clean_calendar_tasks",
-  houseParts: "clean_calendar_house_parts",
-  calendar: "clean_calendar_current"
-};
-
-function checkForLocalMigration() {
-  const hasOldData = Object.values(LEGACY_STORAGE_KEYS).some(key => localStorage.getItem(key));
-  if (hasOldData) {
-    migrateDataBtn.style.display = "block";
-  }
-}
-
-function migrateLocalDataToFirestore() {
-  const confirmed = confirm(
-    "Questo sovrascriverà i dati condivisi nel cloud (persone, mansioni, zone di pulizia, calendario) con quelli salvati in questo browser. Procedere?"
-  );
-  if (!confirmed) return;
-
-  Object.entries(LEGACY_STORAGE_KEYS).forEach(([firestoreKey, localKey]) => {
-    const raw = localStorage.getItem(localKey);
-    if (raw) {
-      persistState(firestoreKey, JSON.parse(raw));
-    }
-    // Remove the legacy key so this migration can't accidentally run again
-    // later and clobber newer cloud data with this old local snapshot.
-    localStorage.removeItem(localKey);
-  });
-
-  migrateDataBtn.style.display = "none";
-  alert("Dati migrati al cloud. Il sito si aggiornerà a breve con questi dati su tutti i dispositivi.");
 }
 
 // Tracks which of the 4 documents have delivered their first snapshot, so we
@@ -331,9 +292,6 @@ function watchFirestoreState() {
 
 // INITIAL SETUP
 function init() {
-  checkForLocalMigration();
-  migrateDataBtn.addEventListener("click", migrateLocalDataToFirestore);
-
   // Disabled until the initial data has arrived from Firestore, so a login
   // attempt during that brief window can't be wrongly rejected
   loginSubmitBtn.disabled = true;
@@ -343,16 +301,19 @@ function init() {
 
   // Safety net: if Firestore never responds at all (success or error - e.g.
   // a network that silently blocks the connection), don't leave the login
-  // button stuck on "Caricamento..." forever. Falls back to local defaults
-  // for whatever didn't load, which at least lets ADMIN/ADMIN in for
-  // troubleshooting.
+  // button stuck on "Caricamento..." forever. This only unblocks the login
+  // UI and shows a warning - it must NEVER fabricate placeholder data into
+  // state.people/tasks/houseParts, because if the connection was merely
+  // slow (not actually dead) and the real snapshot arrives afterward, any
+  // save made in between (e.g. generating a calendar, editing a person)
+  // would persist those fake defaults to Firestore and clobber real data.
   setTimeout(() => {
     if (appBootstrapped) return;
     hadFirestoreLoadError = true;
     loginConnectionWarning.style.display = "block";
-    if (pendingInitialLoads.people) { state.people = [...DEFAULT_PEOPLE]; pendingInitialLoads.people = false; }
-    if (pendingInitialLoads.tasks) { state.tasks = [...DEFAULT_TASKS]; pendingInitialLoads.tasks = false; }
-    if (pendingInitialLoads.houseParts) { state.houseParts = [...DEFAULT_HOUSE_PARTS]; pendingInitialLoads.houseParts = false; }
+    pendingInitialLoads.people = false;
+    pendingInitialLoads.tasks = false;
+    pendingInitialLoads.houseParts = false;
     pendingInitialLoads.calendar = false;
     checkBootstrapComplete();
   }, 8000);

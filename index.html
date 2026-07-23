@@ -86,121 +86,116 @@
           </div>
         </div>
 
-        <!-- METER READING -->
-        <div class="card meter-card">
-          <h3 class="card-title">Lettura contatori e pulizia portico</h3>
-          <div id="meter-display-container">
-            <span id="meter-assignee-text" class="meter-value">-</span>
-          </div>
-        </div>
-
-        <!-- HOUSE CLEANING -->
-        <div class="card">
-          <h3 class="card-title">Pulizia Casa</h3>
-          <div id="house-cleaning-list" class="house-cleaning-grid">
-            <!-- Dynamically populated -->
-            <div class="house-part-card">
-              <div class="house-part-name">Zona Giorno</div>
-              <div class="house-part-assignee">-</div>
+        <!-- Everything below is hidden while a person search is active -->
+        <div id="calendar-full-view">
+          <!-- METER READING -->
+          <div class="card meter-card">
+            <h3 class="card-title">Lettura contatori e pulizia portico</h3>
+            <div id="meter-display-container">
+              <span id="meter-assignee-text" class="meter-value">-</span>
             </div>
           </div>
-        </div>
 
-        <!-- WEEKLY CALENDAR -->
-        <div class="card">
-          <h3 class="card-title">Calendario Settimanale</h3>
-          <div id="weekly-calendar-container" class="calendar-days-container">
-          <!-- Columns for Friday to Thursday -->
-          <div class="day-column" data-day="venerdì">
-            <div class="day-header">venerdì</div>
-            <div class="day-tasks-list"></div>
+          <!-- HOUSE CLEANING -->
+          <div class="card">
+            <h3 class="card-title">Pulizia Casa</h3>
+            <div id="house-cleaning-list" class="house-cleaning-grid">
+              <!-- Dynamically populated -->
+              <div class="house-part-card">
+                <div class="house-part-name">Zona Giorno</div>
+                <div class="house-part-assignee">-</div>
+              </div>
+            </div>
           </div>
-          <div class="day-column" data-day="sabato">
-            <div class="day-header">sabato</div>
-            <div class="day-tasks-list"></div>
-          </div>
-          <div class="day-column" data-day="domenica">
-            <div class="day-header">domenica</div>
-            <div class="day-tasks-list"></div>
-          </div>
-          <div class="day-column" data-day="lunedì">
-            <div class="day-header">lunedì</div>
-            <div class="day-tasks-list"></div>
-          </div>
-          <div class="day-column" data-day="martedì">
-            <div class="day-header">martedì</div>
-            <div class="day-tasks-list"></div>
-          </div>
-          <div class="day-column" data-day="mercoledì">
-            <div class="day-header">mercoledì</div>
-            <div class="day-tasks-list"></div>
-          </div>
-          <div class="day-column" data-day="giovedì">
-            <div class="day-header">giovedì</div>
-            <div class="day-tasks-list"></div>
-          </div>
-          </div>
-        </div>
 
-        <!-- EVENING CHECK -->
-        <div class="card">
-          <h3 class="card-title">Controllo Serale</h3>
-          <div id="evening-check-list" class="evening-check-container">
-            <!-- Dynamically populated -->
+          <!-- WEEKLY CALENDAR -->
+          <div class="card">
+            <h3 class="card-title">Calendario Settimanale</h3>
+            <div id="weekly-calendar-container" class="calendar-days-container">
+            <!-- Columns for Friday to Thursday -->
+            <div class="day-column" data-day="venerdì">
+              <div class="day-header">venerdì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="sabato">
+              <div class="day-header">sabato</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="domenica">
+              <div class="day-header">domenica</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="lunedì">
+              <div class="day-header">lunedì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="martedì">
+              <div class="day-header">martedì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="mercoledì">
+              <div class="day-header">mercoledì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="giovedì">
+              <div class="day-header">giovedì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            </div>
           </div>
-        </div>
 
-        <!-- LAUNDRY TABLE -->
-        <div class="card">
-          <h3 class="card-title">Turni Lavanderia</h3>
-          <div class="table-responsive">
-            <table class="laundry-table">
-              <thead>
-                <tr id="laundry-days-header">
-                  <th>Turno</th>
-                  <th>venerdì</th>
-                  <th>sabato</th>
-                  <th>domenica</th>
-                  <th>lunedì</th>
-                  <th>martedì</th>
-                  <th>mercoledì</th>
-                  <th>giovedì</th>
-                </tr>
-              </thead>
-              <tbody id="laundry-table-body">
-                <tr data-shift="mattina">
-                  <td class="laundry-shift-label">Mattina</td>
-                  <!-- Tds populated dynamically -->
-                  <td data-day="venerdì">-</td>
-                  <td data-day="sabato">-</td>
-                  <td data-day="domenica">-</td>
-                  <td data-day="lunedì">-</td>
-                  <td data-day="martedì">-</td>
-                  <td data-day="mercoledì">-</td>
-                  <td data-day="giovedì">-</td>
-                </tr>
-                <tr data-shift="pomeriggio">
-                  <td class="laundry-shift-label">Pomeriggio</td>
-                  <!-- Tds populated dynamically -->
-                  <td data-day="venerdì">-</td>
-                  <td data-day="sabato">-</td>
-                  <td data-day="domenica">-</td>
-                  <td data-day="lunedì">-</td>
-                  <td data-day="martedì">-</td>
-                  <td data-day="mercoledì">-</td>
-                  <td data-day="giovedì">-</td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- EVENING CHECK -->
+          <div class="card">
+            <h3 class="card-title">Controllo Serale</h3>
+            <div id="evening-check-list" class="evening-check-container">
+              <!-- Dynamically populated -->
+            </div>
           </div>
-        </div>
 
-        <!-- EXPLANATIONS SECTION -->
-        <div class="card">
-          <h3 class="card-title">Spiegazione delle Attività</h3>
-          <ul id="task-explanations" class="desc-list">
-            <!-- Dynamically populated from Modifica Mansioni -->
-          </ul>
+          <!-- LAUNDRY TABLE -->
+          <div class="card">
+            <h3 class="card-title">Turni Lavanderia</h3>
+            <div class="table-responsive">
+              <table class="laundry-table">
+                <thead>
+                  <tr id="laundry-days-header">
+                    <th>Turno</th>
+                    <th>venerdì</th>
+                    <th>sabato</th>
+                    <th>domenica</th>
+                    <th>lunedì</th>
+                    <th>martedì</th>
+                    <th>mercoledì</th>
+                    <th>giovedì</th>
+                  </tr>
+                </thead>
+                <tbody id="laundry-table-body">
+                  <tr data-shift="mattina">
+                    <td class="laundry-shift-label">Mattina</td>
+                    <!-- Tds populated dynamically -->
+                    <td data-day="venerdì">-</td>
+                    <td data-day="sabato">-</td>
+                    <td data-day="domenica">-</td>
+                    <td data-day="lunedì">-</td>
+                    <td data-day="martedì">-</td>
+                    <td data-day="mercoledì">-</td>
+                    <td data-day="giovedì">-</td>
+                  </tr>
+                  <tr data-shift="pomeriggio">
+                    <td class="laundry-shift-label">Pomeriggio</td>
+                    <!-- Tds populated dynamically -->
+                    <td data-day="venerdì">-</td>
+                    <td data-day="sabato">-</td>
+                    <td data-day="domenica">-</td>
+                    <td data-day="lunedì">-</td>
+                    <td data-day="martedì">-</td>
+                    <td data-day="mercoledì">-</td>
+                    <td data-day="giovedì">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 

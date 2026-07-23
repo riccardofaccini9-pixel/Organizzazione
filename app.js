@@ -123,12 +123,12 @@ const meterAssigneeText = document.getElementById("meter-assignee-text");
 const houseCleaningList = document.getElementById("house-cleaning-list");
 const eveningCheckList = document.getElementById("evening-check-list");
 const laundryTableBody = document.getElementById("laundry-table-body");
-const taskExplanations = document.getElementById("task-explanations");
 
 // "Cosa faccio oggi?" search
 const searchPersonInput = document.getElementById("search-person-input");
 const searchDayInput = document.getElementById("search-day-input");
 const searchTodayResults = document.getElementById("search-today-results");
+const calendarFullView = document.getElementById("calendar-full-view");
 
 // Wizard Elements
 const startWizardBtn = document.getElementById("start-wizard-btn");
@@ -1139,23 +1139,6 @@ function renderCalendar() {
     }
   });
 
-  // RENDER EXPLANATIONS
-  taskExplanations.innerHTML = "";
-  if (state.tasks.length === 0) {
-    taskExplanations.innerHTML = "<li>Nessuna mansione configurata.</li>";
-  } else {
-    [...state.tasks].sort((a, b) => a.priority - b.priority).forEach(t => {
-      const li = document.createElement("li");
-      if (t.description && t.description.trim()) {
-        li.innerHTML = `<strong>${escapeHtml(t.name)}</strong>: ${escapeHtml(t.description)}`;
-      } else {
-        const linked = state.tasks.find(lt => lt.id === t.linkedTask);
-        const linkedStr = linked ? ` (Se assegnata, l'addetto svolge anche '${linked.name}')` : "";
-        li.innerHTML = `<strong>${escapeHtml(t.name)}</strong>: priorità ${t.priority}, minimo ${t.minPeople} addetti.${linkedStr}`;
-      }
-      taskExplanations.appendChild(li);
-    });
-  }
 }
 
 // "COSA FACCIO OGGI?" SEARCH
@@ -1170,9 +1153,14 @@ function runTodaySearch() {
   const dayQuery = searchDayInput.value.trim().toLowerCase();
 
   if (!personQuery) {
+    // No person selected: cancel the search, show the full calendar again
+    calendarFullView.style.display = "";
     searchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Seleziona una persona per vedere le sue attività (per la vista di tutti usa il Calendario Settimanale qui sotto).</p>`;
     return;
   }
+
+  // A person is selected: show only the search results, hide everything else
+  calendarFullView.style.display = "none";
 
   if (!state.calendar) {
     searchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessun calendario generato.</p>`;

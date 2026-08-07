@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Export dati da Firestore</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    pre { background: #f4f4f4; padding: 16px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+    #status { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Export dati da Firestore</h1>
+  <p>
+    Strumento una tantum, usato SOLO per migrare i dati esistenti da
+    Firestore al nuovo backend (SQLite). Non è collegato all'app principale.
+    Apri questa pagina nel browser finché il progetto Firebase esiste ancora,
+    poi elimina questo file (e il progetto Firebase) una volta completata la
+    migrazione.
+  </p>
+  <p id="status">Lettura dati da Firestore...</p>
+  <pre id="output"></pre>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script>
+    // Stessa configurazione pubblica già usata dal vecchio app.js.
+    const firebaseConfig = {
+      apiKey: "AIzaSyDc0jnyltNmarf_jAJ9pz4DKgF07e5JB1g",
+      authDomain: "organizzatore-3219d.firebaseapp.com",
+      projectId: "organizzatore-3219d",
+      storageBucket: "organizzatore-3219d.firebasestorage.app",
+      messagingSenderId: "1065130050117",
+      appId: "1:1065130050117:web:bffef8f557ddfb3b84d92c",
+      measurementId: "G-RHWJGTJYE9"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const statusEl = document.getElementById("status");
+    const outputEl = document.getElementById("output");
+    const KEYS = ["people", "tasks", "houseParts", "calendar"];
+
+    async function exportData() {
+      const result = {};
+      for (const key of KEYS) {
+        const snap = await db.collection("appState").doc(key).get();
+        result[key] = snap.exists ? snap.data().value : null;
+      }
+      return result;
+    }
+
+    function downloadJSON(data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "firestore-export.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    exportData()
+      .then(data => {
+        statusEl.textContent = "Fatto. Download di firestore-export.json avviato (se bloccato dal browser, copia il JSON qui sotto in un file firestore-export.json a mano).";
+        outputEl.textContent = JSON.stringify(data, null, 2);
+        downloadJSON(data);
+      })
+      .catch(err => {
+        statusEl.textContent = "Errore durante l'export: " + err.message;
+        console.error(err);
+      });
+  </script>
+</body>
+</html>

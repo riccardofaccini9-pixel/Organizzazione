@@ -13,41 +13,8 @@ let editingTaskId = null;
 let editingPersonId = null;
 let editingHousePartId = null;
 
-// INITIAL SEED DATA
-const DEFAULT_ADMIN = {
-  id: "admin-default",
-  name: "ADMIN",
-  email: "ADMIN@gmail.com",
-  password: "ADMIN",
-  role: "admin"
-};
-
-const DEFAULT_PEOPLE = [
-  DEFAULT_ADMIN,
-  { id: "p1", name: "Mario Rossi", email: "mario@gmail.com", password: "mario", role: "cadetto" },
-  { id: "p2", name: "Luigi Verdi", email: "luigi@gmail.com", password: "luigi", role: "cadetto" },
-  { id: "p3", name: "Anna Bianchi", email: "anna@gmail.com", password: "anna", role: "cadetto" },
-  { id: "p4", name: "Sofia Neri", email: "sofia@gmail.com", password: "sofia", role: "cadetto" },
-  { id: "p5", name: "Luca Gialli", email: "luca@gmail.com", password: "luca", role: "cadetto" },
-  { id: "p6", name: "Elena Viola", email: "elena@gmail.com", password: "elena", role: "cadetto" },
-  { id: "p7", name: "Marco Bruno", email: "marco@gmail.com", password: "marco", role: "cadetto" }
-];
-
-const DEFAULT_TASKS = [
-  { id: "t1", name: "Lavare i piatti", minPeople: 2, priority: 1, linkedTask: "none" },
-  { id: "t2", name: "Cucinare pranzo", minPeople: 1, priority: 2, linkedTask: "none" },
-  { id: "t3", name: "Cucinare cena", minPeople: 2, priority: 3, linkedTask: "none" },
-  { id: "t4", name: "Buttare spazzatura", minPeople: 1, priority: 4, linkedTask: "none" },
-  { id: "t5", name: "Asciugare stoviglie", minPeople: 1, priority: 5, linkedTask: "t1" } // Linked to Lavare i piatti
-];
-
-const DEFAULT_HOUSE_PARTS = [
-  { id: "hp1", name: "Cucina", minPeople: 1, priority: 1 },
-  { id: "hp2", name: "Bagno Primo Piano", minPeople: 1, priority: 2 },
-  { id: "hp3", name: "Bagno Secondo Piano", minPeople: 1, priority: 3 },
-  { id: "hp4", name: "Salotto & Corridoio", minPeople: 1, priority: 4 },
-  { id: "hp5", name: "Scale & Vetrate", minPeople: 1, priority: 5 }
-];
+// Default seed data (used when no data exists yet) now lives server-side in
+// db.py, so the server always returns real data - no client-side seeding.
 
 const DAYS_OF_WEEK = ["venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì", "giovedì"];
 const WIZARD_DAYS = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
@@ -141,52 +108,43 @@ const absenceTableBody = document.getElementById("absence-table-body");
 const backToStep1Btn = document.getElementById("back-to-step1-btn");
 const generateFinalBtn = document.getElementById("generate-final-btn");
 
-// FIREBASE (shared cloud storage, so every device sees the same data)
-const firebaseConfig = {
-  apiKey: "AIzaSyDc0jnyltNmarf_jAJ9pz4DKgF07e5JB1g",
-  authDomain: "organizzatore-3219d.firebaseapp.com",
-  projectId: "organizzatore-3219d",
-  storageBucket: "organizzatore-3219d.firebasestorage.app",
-  messagingSenderId: "1065130050117",
-  appId: "1:1065130050117:web:bffef8f557ddfb3b84d92c",
-  measurementId: "G-RHWJGTJYE9"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+// BACKEND API (shared server storage, so every device sees the same data)
+const API_BASE = "/api";
 
 function persistState(key, value) {
-  db.collection("appState").doc(key).set({ value })
-    .catch(err => console.error(`Errore salvataggio "${key}" su Firestore:`, err));
+  fetch(`${API_BASE}/state/${key}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value })
+  }).catch(err => console.error(`Errore salvataggio "${key}" sul server:`, err));
 }
 
-// Tracks which of the 4 documents have delivered their first snapshot, so we
-// only run the one-time app bootstrap (auto-login check) once all initial
-// data has arrived, while every snapshot after that live-refreshes the UI.
+// How often to re-poll the server for changes made from other devices/tabs,
+// to approximate the live-sync behaviour Firestore's onSnapshot used to give.
+const POLL_INTERVAL_MS = 5000;
+
 let appBootstrapped = false;
-const pendingInitialLoads = { people: true, tasks: true, houseParts: true, calendar: true };
+let hadLoadError = false;
 
-let hadFirestoreLoadError = false;
-
-// Shared handler for Firestore read errors (e.g. blocked/unreachable network):
-// surfaces a visible warning instead of failing silently, and - if this
-// document was still part of the initial load - unblocks the login button
+// Shared handler for state-load errors (e.g. blocked/unreachable network):
+// surfaces a visible warning instead of failing silently, and - if the app
+// hasn't finished its initial bootstrap yet - unblocks the login button
 // anyway rather than leaving it stuck on "Caricamento..." forever.
-function handleFirestoreError(key, err) {
-  console.error(`Errore lettura "${key}" da Firestore:`, err);
-  hadFirestoreLoadError = true;
+function handleLoadError(err) {
+  console.error("Errore lettura stato dal server:", err);
+  hadLoadError = true;
   loginConnectionWarning.style.display = "block";
-  if (pendingInitialLoads[key]) {
-    pendingInitialLoads[key] = false;
-    checkBootstrapComplete();
+  if (!appBootstrapped) {
+    completeBootstrap();
   }
 }
 
-function checkBootstrapComplete() {
-  if (appBootstrapped || Object.values(pendingInitialLoads).some(Boolean)) return;
+function completeBootstrap() {
+  if (appBootstrapped) return;
   appBootstrapped = true;
   loginSubmitBtn.disabled = false;
   loginSubmitBtn.textContent = "Accedi";
-  if (!hadFirestoreLoadError) {
+  if (!hadLoadError) {
     loginConnectionWarning.style.display = "none";
   }
 
@@ -220,103 +178,65 @@ function refreshLiveUI() {
   renderCalendar();
 }
 
-function watchFirestoreState() {
-  db.collection("appState").doc("people").onSnapshot(snap => {
-    if (snap.exists) {
-      state.people = snap.data().value;
-    } else if (pendingInitialLoads.people) {
-      state.people = [...DEFAULT_PEOPLE];
-      persistState("people", state.people);
-    }
-    if (pendingInitialLoads.people) {
-      pendingInitialLoads.people = false;
-      checkBootstrapComplete();
-    } else {
-      refreshLiveUI();
-    }
-  }, err => handleFirestoreError("people", err));
+function applyServerState(data) {
+  state.people = data.people;
+  state.tasks = data.tasks;
+  // Migrate zones saved before minPeople/priority existed, so stale data
+  // doesn't silently break assignment (a missing minPeople stops the
+  // assignment loop from ever running).
+  state.houseParts = (data.houseParts || []).map(zone => ({
+    id: zone.id,
+    name: zone.name,
+    minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
+    priority: (typeof zone.priority === "number") ? zone.priority : 999
+  }));
+  state.calendar = data.calendar || null;
+}
 
-  db.collection("appState").doc("tasks").onSnapshot(snap => {
-    if (snap.exists) {
-      state.tasks = snap.data().value;
-    } else if (pendingInitialLoads.tasks) {
-      state.tasks = [...DEFAULT_TASKS];
-      persistState("tasks", state.tasks);
-    }
-    if (pendingInitialLoads.tasks) {
-      pendingInitialLoads.tasks = false;
-      checkBootstrapComplete();
+async function pollServerState() {
+  try {
+    const res = await fetch(`${API_BASE}/state`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    applyServerState(data);
+    if (!appBootstrapped) {
+      completeBootstrap();
     } else {
       refreshLiveUI();
     }
-  }, err => handleFirestoreError("tasks", err));
+  } catch (err) {
+    handleLoadError(err);
+  }
+}
 
-  db.collection("appState").doc("houseParts").onSnapshot(snap => {
-    let parts;
-    if (snap.exists) {
-      parts = snap.data().value;
-    } else if (pendingInitialLoads.houseParts) {
-      parts = [...DEFAULT_HOUSE_PARTS];
-    } else {
-      parts = state.houseParts;
-    }
-    // Migrate zones saved before minPeople/priority existed, so stale data
-    // doesn't silently break assignment (a missing minPeople stops the
-    // assignment loop from ever running).
-    state.houseParts = parts.map(zone => ({
-      id: zone.id,
-      name: zone.name,
-      minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
-      priority: (typeof zone.priority === "number") ? zone.priority : 999
-    }));
-    if (pendingInitialLoads.houseParts && !snap.exists) {
-      persistState("houseParts", state.houseParts);
-    }
-    if (pendingInitialLoads.houseParts) {
-      pendingInitialLoads.houseParts = false;
-      checkBootstrapComplete();
-    } else {
-      refreshLiveUI();
-    }
-  }, err => handleFirestoreError("houseParts", err));
-
-  db.collection("appState").doc("calendar").onSnapshot(snap => {
-    state.calendar = snap.exists ? snap.data().value : null;
-    if (pendingInitialLoads.calendar) {
-      pendingInitialLoads.calendar = false;
-      checkBootstrapComplete();
-    } else {
-      refreshLiveUI();
-    }
-  }, err => handleFirestoreError("calendar", err));
+function startPolling() {
+  pollServerState();
+  setInterval(pollServerState, POLL_INTERVAL_MS);
 }
 
 // INITIAL SETUP
 function init() {
-  // Disabled until the initial data has arrived from Firestore, so a login
+  // Disabled until the initial data has arrived from the server, so a login
   // attempt during that brief window can't be wrongly rejected
   loginSubmitBtn.disabled = true;
   loginSubmitBtn.textContent = "Caricamento...";
 
-  watchFirestoreState();
+  startPolling();
 
-  // Safety net: if Firestore never responds at all (success or error - e.g.
-  // a network that silently blocks the connection), don't leave the login
-  // button stuck on "Caricamento..." forever. This only unblocks the login
-  // UI and shows a warning - it must NEVER fabricate placeholder data into
-  // state.people/tasks/houseParts, because if the connection was merely
-  // slow (not actually dead) and the real snapshot arrives afterward, any
-  // save made in between (e.g. generating a calendar, editing a person)
-  // would persist those fake defaults to Firestore and clobber real data.
+  // Safety net: if the server never responds at all (success or error -
+  // e.g. a network that silently blocks the connection), don't leave the
+  // login button stuck on "Caricamento..." forever. This only unblocks the
+  // login UI and shows a warning - it must NEVER fabricate placeholder data
+  // into state.people/tasks/houseParts, because if the connection was
+  // merely slow (not actually dead) and the real response arrives
+  // afterward, any save made in between (e.g. generating a calendar,
+  // editing a person) would persist those fake defaults to the server and
+  // clobber real data.
   setTimeout(() => {
     if (appBootstrapped) return;
-    hadFirestoreLoadError = true;
+    hadLoadError = true;
     loginConnectionWarning.style.display = "block";
-    pendingInitialLoads.people = false;
-    pendingInitialLoads.tasks = false;
-    pendingInitialLoads.houseParts = false;
-    pendingInitialLoads.calendar = false;
-    checkBootstrapComplete();
+    completeBootstrap();
   }, 8000);
 
   // Bind Events

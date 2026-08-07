@@ -1,0 +1,111 @@
+"""SQLite-backed key/value store for the app state.
+
+Replaces the Firestore "appState" collection: same 4 keys (people, tasks,
+houseParts, calendar), each holding a JSON-serializable value.
+"""
+import json
+import os
+import sqlite3
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "app.db")
+
+DEFAULT_ADMIN = {
+    "id": "admin-default",
+    "name": "ADMIN",
+    "email": "ADMIN@gmail.com",
+    "password": "ADMIN",
+    "role": "admin",
+}
+
+DEFAULT_PEOPLE = [
+    DEFAULT_ADMIN,
+    {"id": "p1", "name": "Mario Rossi", "email": "mario@gmail.com", "password": "mario", "role": "cadetto"},
+    {"id": "p2", "name": "Luigi Verdi", "email": "luigi@gmail.com", "password": "luigi", "role": "cadetto"},
+    {"id": "p3", "name": "Anna Bianchi", "email": "anna@gmail.com", "password": "anna", "role": "cadetto"},
+    {"id": "p4", "name": "Sofia Neri", "email": "sofia@gmail.com", "password": "sofia", "role": "cadetto"},
+    {"id": "p5", "name": "Luca Gialli", "email": "luca@gmail.com", "password": "luca", "role": "cadetto"},
+    {"id": "p6", "name": "Elena Viola", "email": "elena@gmail.com", "password": "elena", "role": "cadetto"},
+    {"id": "p7", "name": "Marco Bruno", "email": "marco@gmail.com", "password": "marco", "role": "cadetto"},
+]
+
+DEFAULT_TASKS = [
+    {"id": "t1", "name": "Lavare i piatti", "minPeople": 2, "priority": 1, "linkedTask": "none"},
+    {"id": "t2", "name": "Cucinare pranzo", "minPeople": 1, "priority": 2, "linkedTask": "none"},
+    {"id": "t3", "name": "Cucinare cena", "minPeople": 2, "priority": 3, "linkedTask": "none"},
+    {"id": "t4", "name": "Buttare spazzatura", "minPeople": 1, "priority": 4, "linkedTask": "none"},
+    {"id": "t5", "name": "Asciugare stoviglie", "minPeople": 1, "priority": 5, "linkedTask": "t1"},
+]
+
+DEFAULT_HOUSE_PARTS = [
+    {"id": "hp1", "name": "Cucina", "minPeople": 1, "priority": 1},
+    {"id": "hp2", "name": "Bagno Primo Piano", "minPeople": 1, "priority": 2},
+    {"id": "hp3", "name": "Bagno Secondo Piano", "minPeople": 1, "priority": 3},
+    {"id": "hp4", "name": "Salotto & Corridoio", "minPeople": 1, "priority": 4},
+    {"id": "hp5", "name": "Scale & Vetrate", "minPeople": 1, "priority": 5},
+]
+
+DEFAULTS = {
+    "people": DEFAULT_PEOPLE,
+    "tasks": DEFAULT_TASKS,
+    "houseParts": DEFAULT_HOUSE_PARTS,
+}
+
+VALID_KEYS = {"people", "tasks", "houseParts", "calendar"}
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_connection()
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_state ("
+            "key TEXT PRIMARY KEY, "
+            "value TEXT NOT NULL"
+            ")"
+        )
+        existing_keys = {row["key"] for row in conn.execute("SELECT key FROM app_state")}
+        for key, default_value in DEFAULTS.items():
+            if key not in existing_keys:
+                conn.execute(
+                    "INSERT INTO app_state (key, value) VALUES (?, ?)",
+                    (key, json.dumps(default_value)),
+                )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_all_state():
+    conn = get_connection()
+    try:
+        rows = conn.execute("SELECT key, value FROM app_state").fetchall()
+        data = {row["key"]: json.loads(row["value"]) for row in rows}
+    finally:
+        conn.close()
+    return {
+        "people": data.get("people", []),
+        "tasks": data.get("tasks", []),
+        "houseParts": data.get("houseParts", []),
+        "calendar": data.get("calendar"),
+    }
+
+
+def set_state(key, value):
+    if key not in VALID_KEYS:
+        raise ValueError(f"Invalid state key: {key}")
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, json.dumps(value)),
+        )
+        conn.commit()
+    finally:
+        conn.close()

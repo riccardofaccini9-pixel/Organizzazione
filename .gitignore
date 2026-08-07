@@ -2,3 +2,7 @@
 Thumbs.db
 *.log
 node_modules/
+*.db
+__pycache__/
+*.pyc
+firestore-export.json

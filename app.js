@@ -175,7 +175,16 @@ function refreshLiveUI() {
   if (!state.calendar) {
     state.calendar = createBlankCalendar();
   }
-  renderCalendar();
+  // While the calendar is unlocked for direct editing, every poll tick
+  // (every POLL_INTERVAL_MS, whether or not anything actually changed
+  // remotely) would otherwise rebuild the day/zone <input> elements from
+  // scratch - kicking the admin's cursor out of whatever field they're
+  // typing in and discarding the unsaved keystrokes. Skip re-rendering the
+  // calendar until they lock it again (toggleLock already re-renders once
+  // editing is saved), so in-progress edits are never clobbered.
+  if (!state.isUnlocked) {
+    renderCalendar();
+  }
 }
 
 function applyServerState(data) {

@@ -2473,6 +2473,14 @@ function generateSettembreCalendar() {
     activeCandidates.forEach(c => { taskAssignmentCounts[t.id][c.id] = 0; });
   });
 
+  // "Aiuto Cucina" convention: whoever ends up first in the assigned list
+  // rinses the dishes, whoever is second dries them - never shown anywhere,
+  // just an ordering the two already know. Track a running balance so the
+  // same person doesn't always land first across the days this recurs.
+  const kitchenHelpRinseCounts = {};
+  const kitchenHelpDryCounts = {};
+  activeCandidates.forEach(c => { kitchenHelpRinseCounts[c.id] = 0; kitchenHelpDryCounts[c.id] = 0; });
+
   WIZARD_DAYS.forEach(day => {
     newCalendar.weekly[day] = [];
     const dailyRosterAll = getPresentCandidatesForDay(day);
@@ -2526,10 +2534,20 @@ function generateSettembreCalendar() {
         assignedCandidates.forEach(c => dailyHardExcluded.add(c.id));
       }
 
+      let orderedAssignedCandidates = assignedCandidates;
+      if (assignedCandidates.length === 2 && task.name.trim().toLowerCase() === "aiuto cucina") {
+        const [a, b] = assignedCandidates;
+        const aBias = kitchenHelpRinseCounts[a.id] - kitchenHelpDryCounts[a.id];
+        const bBias = kitchenHelpRinseCounts[b.id] - kitchenHelpDryCounts[b.id];
+        orderedAssignedCandidates = aBias <= bBias ? [a, b] : [b, a];
+        kitchenHelpRinseCounts[orderedAssignedCandidates[0].id]++;
+        kitchenHelpDryCounts[orderedAssignedCandidates[1].id]++;
+      }
+
       newCalendar.weekly[day].push({
         taskId: task.id,
         name: task.name,
-        assigned: assignedCandidates.map(c => c.name)
+        assigned: orderedAssignedCandidates.map(c => c.name)
       });
 
       // Linked child tasks reuse the parent's assignees only when they share

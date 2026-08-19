@@ -370,6 +370,36 @@
         </div>
       </section>
 
+      <!-- TAB: GESTIONE ASPIRANTI (fixed 16-slot roster, name-only - no login profile) -->
+      <section id="tab-aspiranti" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Gestione Aspiranti</h2>
+        </div>
+
+        <div class="card">
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            I 16 slot (fissi) usati nella tabella Turni Docce e nella generazione dei turni Settembre. Qui si modifica solo il nome dietro ogni slot: non viene creato alcun account/profilo di accesso.
+          </p>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Slot</th>
+                  <th>Genere</th>
+                  <th>Nome</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-aspiranti-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-actions" style="justify-content: flex-end; margin-top: 12px;">
+            <button id="save-settembre-aspiranti-btn" class="btn btn-primary" style="width: auto;">Salva Nomi</button>
+          </div>
+        </div>
+      </section>
+
       <!-- TAB: SETTEMBRE -->
       <section id="tab-settembre" class="tab-content">
         <div class="page-header">
@@ -438,28 +468,6 @@
               <div class="day-header">domenica</div>
               <div class="day-tasks-list"></div>
             </div>
-          </div>
-        </div>
-
-        <!-- ADMIN: GESTIONE ASPIRANTI (fixed 16-slot roster, name-only edit) -->
-        <div class="card admin-only">
-          <h3 class="card-title">Gestione Aspiranti (16 slot fissi)</h3>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Slot</th>
-                  <th>Genere</th>
-                  <th>Nome</th>
-                </tr>
-              </thead>
-              <tbody id="settembre-aspiranti-table-body">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
-          </div>
-          <div class="modal-actions" style="justify-content: flex-end; margin-top: 12px;">
-            <button id="save-settembre-aspiranti-btn" class="btn btn-primary" style="width: auto;">Salva Nomi</button>
           </div>
         </div>
 
@@ -664,6 +672,14 @@
                   <path d="M16,13C15.71,13 15.38,13 15.03,13.05C16.19,13.89 17,15 17,16.5V19H23V16.5C23,14.17 18.33,13 16,13M8,13C5.67,13 1,14.17 1,16.5V19H15V16.5C15,14.17 10.33,13 8,13M8,11A3,3 0 0,0 11,8A3,3 0 0,0 8,5A3,3 0 0,0 5,8A3,3 0 0,0 8,11M16,11A3,3 0 0,0 19,8A3,3 0 0,0 16,5A3,3 0 0,0 13,8A3,3 0 0,0 16,11Z" />
                 </svg>
                 <span>Persone</span>
+              </button>
+            </li>
+            <li class="nav-item admin-only" data-tab="tab-aspiranti">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z" />
+                </svg>
+                <span>Aspiranti</span>
               </button>
             </li>
           </ul>

@@ -1624,8 +1624,8 @@ function saveEditedSettembreCalendarState() {
 // Same free-text + picker pattern as assigneePickerHTML, but sourced from
 // the combined Settembre roster (supervisori + aspiranti) instead of
 // getSchedulablePeople().
-function settembreAssigneePickerHTML(inputId) {
-  const roster = getSettembreRoster();
+function settembreAssigneePickerHTML(inputId, rosterOverride) {
+  const roster = rosterOverride || getSettembreRoster();
   return `<select id="${inputId}-picker" class="input-field" style="margin-top: 4px; padding: 4px 8px; font-size: 12px;" onchange="addNameToAssigneeField('${inputId}', this.value)">
     <option value="">+ Aggiungi persona...</option>
     ${roster.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('')}
@@ -1677,7 +1677,7 @@ function renderSettembreCalendar() {
       let assigneeHTML = "";
       if (state.isSettembreUnlocked) {
         assigneeHTML = `<input type="text" id="edit-settembre-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">
-          ${settembreAssigneePickerHTML(`edit-settembre-house-${zone.id}`)}`;
+          ${settembreAssigneePickerHTML(`edit-settembre-house-${zone.id}`, aspirantiRoster)}`;
       } else {
         assigneeHTML = `<span class="house-part-assignee">${escapeHtml(assignedNames.join(', ')) || 'Non assegnato'}</span>`;
       }
@@ -2621,11 +2621,13 @@ function generateSettembreCalendar() {
   }
 
   // ZONE DI PULIZIA - same approach as the original scheda's house cleaning
-  // zones: open to the whole combined roster (no aspiranti/supervisori
-  // target), primaries drawn only from people present all week, partially
-  // present people distributed as helpers.
+  // zones (primaries drawn only from people present all week, partially
+  // present people distributed as helpers), but the eligible pool is
+  // aspiranti only.
   const settembreZones = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
-  const settembreZonePrimaryPool = fullyPresentCandidates.length > 0 ? fullyPresentCandidates : activeCandidates;
+  const fullyPresentAspirantiForZones = fullyPresentCandidates.filter(c => c.kind === "aspirante");
+  const activeAspirantiForZones = activeCandidates.filter(c => c.kind === "aspirante");
+  const settembreZonePrimaryPool = fullyPresentAspirantiForZones.length > 0 ? fullyPresentAspirantiForZones : activeAspirantiForZones;
 
   settembreZones.forEach(zone => {
     const assignedCandidates = [];
@@ -2647,8 +2649,9 @@ function generateSettembreCalendar() {
     };
   });
 
+  const partiallyAbsentAspirantiForZones = partiallyAbsentCandidates.filter(item => item.person.kind === "aspirante");
   if (settembreZones.length > 0) {
-    partiallyAbsentCandidates.forEach((item, idx) => {
+    partiallyAbsentAspirantiForZones.forEach((item, idx) => {
       const targetZone = settembreZones[idx % settembreZones.length];
       newCalendar.houseCleaning[targetZone.id].helpers.push({
         name: item.person.name,

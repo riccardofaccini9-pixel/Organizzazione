@@ -434,6 +434,76 @@
         </div>
       </section>
 
+      <!-- TAB: GENERAZIONE TURNI SETTEMBRE (visible only from within the Settembre context) -->
+      <section id="tab-genera-settembre" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Genera Turni Settembre</h2>
+        </div>
+
+        <div class="card">
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            Il turno unisce i 16 aspiranti (Gestione Aspiranti) e i supervisori: le persone con ruolo Cadetto o Admin gestite dalla scheda <strong>Persone</strong> della parte principale.
+          </p>
+
+          <div id="gen-step-init-settembre" class="wizard-container">
+            <button id="start-wizard-btn-settembre" class="btn-generate-main">Genera turni Settembre</button>
+          </div>
+
+          <div id="gen-step-absent-settembre" class="wizard-step">
+            <h3 class="card-title">Passo 1: Seleziona gli Assenti (Aspiranti e Supervisori)</h3>
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+              Seleziona chi sarà assente (parzialmente o totalmente) questa settimana. Se questa settimana sono tutti presenti, non selezionare nessuno.
+            </p>
+
+            <div id="wizard-people-list-settembre" class="people-checkbox-grid">
+              <!-- Dynamically populated -->
+            </div>
+
+            <div class="wizard-footer">
+              <button id="confirm-absent-btn-settembre" class="btn btn-primary" style="width: auto; padding-left: 30px; padding-right: 30px;">
+                Conferma Assenti
+              </button>
+            </div>
+          </div>
+
+          <div id="gen-step-details-settembre" class="wizard-step">
+            <h3 class="card-title">Passo 2: Giorni di Presenza Specifici</h3>
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+              Spunta solo i giorni in cui la persona sarà presente.
+            </p>
+
+            <div id="step2-present-list-settembre" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; font-size: 14px; display: none;"></div>
+
+            <div class="table-responsive">
+              <table class="absence-table">
+                <thead>
+                  <tr>
+                    <th>Persona</th>
+                    <th>Lunedì</th>
+                    <th>Martedì</th>
+                    <th>Mercoledì</th>
+                    <th>Giovedì</th>
+                    <th>Venerdì</th>
+                    <th>Sabato</th>
+                    <th>Domenica</th>
+                  </tr>
+                </thead>
+                <tbody id="absence-table-body-settembre">
+                  <!-- Dynamically populated with rows for selected people -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="wizard-footer" style="justify-content: space-between; align-items: center;">
+              <button id="back-to-step1-btn-settembre" class="btn btn-secondary" style="width: auto;">Indietro</button>
+              <button id="generate-final-btn-settembre" class="btn btn-success" style="width: auto; padding-left: 30px; padding-right: 30px;">
+                Genera Turni Settembre
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- TAB: SETTEMBRE -->
       <section id="tab-settembre" class="tab-content">
         <div class="page-header">
@@ -505,67 +575,6 @@
           </div>
         </div>
 
-        <!-- ADMIN: GENERAZIONE TURNI SETTEMBRE -->
-        <div class="card admin-only">
-          <h3 class="card-title">Genera Turni Settembre</h3>
-
-          <div id="gen-step-init-settembre" class="wizard-container">
-            <button id="start-wizard-btn-settembre" class="btn-generate-main">Genera turni Settembre</button>
-          </div>
-
-          <div id="gen-step-absent-settembre" class="wizard-step">
-            <h3 class="card-title">Passo 1: Seleziona gli Assenti (Aspiranti e Supervisori)</h3>
-            <p style="color: var(--text-muted); margin-bottom: 16px;">
-              Seleziona chi sarà assente (parzialmente o totalmente) questa settimana. Se questa settimana sono tutti presenti, non selezionare nessuno.
-            </p>
-
-            <div id="wizard-people-list-settembre" class="people-checkbox-grid">
-              <!-- Dynamically populated -->
-            </div>
-
-            <div class="wizard-footer">
-              <button id="confirm-absent-btn-settembre" class="btn btn-primary" style="width: auto; padding-left: 30px; padding-right: 30px;">
-                Conferma Assenti
-              </button>
-            </div>
-          </div>
-
-          <div id="gen-step-details-settembre" class="wizard-step">
-            <h3 class="card-title">Passo 2: Giorni di Presenza Specifici</h3>
-            <p style="color: var(--text-muted); margin-bottom: 16px;">
-              Spunta solo i giorni in cui la persona sarà presente.
-            </p>
-
-            <div id="step2-present-list-settembre" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; font-size: 14px; display: none;"></div>
-
-            <div class="table-responsive">
-              <table class="absence-table">
-                <thead>
-                  <tr>
-                    <th>Persona</th>
-                    <th>Lunedì</th>
-                    <th>Martedì</th>
-                    <th>Mercoledì</th>
-                    <th>Giovedì</th>
-                    <th>Venerdì</th>
-                    <th>Sabato</th>
-                    <th>Domenica</th>
-                  </tr>
-                </thead>
-                <tbody id="absence-table-body-settembre">
-                  <!-- Dynamically populated with rows for selected people -->
-                </tbody>
-              </table>
-            </div>
-
-            <div class="wizard-footer" style="justify-content: space-between; align-items: center;">
-              <button id="back-to-step1-btn-settembre" class="btn btn-secondary" style="width: auto;">Indietro</button>
-              <button id="generate-final-btn-settembre" class="btn btn-success" style="width: auto; padding-left: 30px; padding-right: 30px;">
-                Genera Turni Settembre
-              </button>
-            </div>
-          </div>
-        </div>
 
         <!-- TURNI DOCCE (fixed weekly grid) -->
         <div class="card">
@@ -677,12 +686,12 @@
                 <span>Persone</span>
               </button>
             </li>
-            <li class="nav-item admin-only settembre-only" data-tab="tab-aspiranti">
+            <li class="nav-item admin-only settembre-only" data-tab="tab-genera-settembre">
               <button>
                 <svg viewBox="0 0 24 24">
-                  <path d="M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z" />
+                  <path d="M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,14.21 4.9,16.21 6.34,17.65L7.75,16.24C6.67,15.16 6,13.66 6,12A6,6 0 0,1 12,6M17.66,6.34L16.25,7.75C17.33,8.83 18,10.34 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,9.79 19.1,7.79 17.66,6.34Z" />
                 </svg>
-                <span>Aspiranti</span>
+                <span>Genera Turni Settembre</span>
               </button>
             </li>
             <li class="nav-item admin-only settembre-only" data-tab="tab-attivita-settembre">
@@ -691,6 +700,14 @@
                   <path d="M14,10H19.5L14,4.5V10M5,3H15L21,9V21A2,2 0 0,1 19,23H5C3.89,23 3,22.1 3,21V5C3,3.89 3.89,3 5,3M5,5V21H19V12H12V5H5M7,9H10V11H7V9M7,13H17V15H7V13M7,17H17V19H7V17Z" />
                 </svg>
                 <span>Attività</span>
+              </button>
+            </li>
+            <li class="nav-item admin-only settembre-only" data-tab="tab-aspiranti">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z" />
+                </svg>
+                <span>Aspiranti</span>
               </button>
             </li>
           </ul>

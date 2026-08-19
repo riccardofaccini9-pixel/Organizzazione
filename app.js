@@ -465,7 +465,7 @@ function switchTab(tabId) {
   if (tabId === "tab-generazione") {
     resetWizard();
   }
-  if (tabId === "tab-settembre") {
+  if (tabId === "tab-genera-settembre") {
     resetSettembreWizard();
   }
 
@@ -927,7 +927,7 @@ function refreshCurrentUserUI() {
 // and reveals its own (Aspiranti/Attività, tagged "settembre-only") -
 // mirroring how the original scheda's admin tabs work, but scoped to
 // whichever context is currently active.
-const SETTEMBRE_CONTEXT_TABS = ["tab-settembre", "tab-aspiranti", "tab-attivita-settembre"];
+const SETTEMBRE_CONTEXT_TABS = ["tab-settembre", "tab-aspiranti", "tab-attivita-settembre", "tab-genera-settembre"];
 
 function isInSettembreContext() {
   const activeSection = document.querySelector(".tab-content.active");

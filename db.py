@@ -45,13 +45,44 @@ DEFAULT_HOUSE_PARTS = [
     {"id": "hp5", "name": "Scale & Vetrate", "minPeople": 1, "priority": 5},
 ]
 
+# The single shared "aspirante" viewer account: passwordless login, read-only
+# access to the Settembre tab only. There must only ever be one of these -
+# see savePerson() in app.js.
+ASPIRANTE_VIEWER = {
+    "id": "aspirante-default",
+    "name": "Aspirante",
+    "email": "aspirante@settembre.local",
+    "password": "",
+    "role": "aspirante",
+}
+
+# Fixed 16-slot roster (13 "U" + 3 "F") backing the Settembre shower-shift
+# table. Slot ids/genders never change (the shower schedule grid is fixed);
+# only "name" is editable by an admin.
+DEFAULT_SETTEMBRE_ASPIRANTI = (
+    [{"id": f"u{i}", "slot": f"U{i}", "gender": "U", "name": f"Aspirante U{i}"} for i in range(1, 14)]
+    + [{"id": f"f{i}", "slot": f"F{i}", "gender": "F", "name": f"Aspirante F{i}"} for i in range(1, 4)]
+)
+
+DEFAULT_SETTEMBRE_TASKS = []
+
 DEFAULTS = {
     "people": DEFAULT_PEOPLE,
     "tasks": DEFAULT_TASKS,
     "houseParts": DEFAULT_HOUSE_PARTS,
+    "settembreAspiranti": DEFAULT_SETTEMBRE_ASPIRANTI,
+    "settembreTasks": DEFAULT_SETTEMBRE_TASKS,
 }
 
-VALID_KEYS = {"people", "tasks", "houseParts", "calendar"}
+VALID_KEYS = {
+    "people",
+    "tasks",
+    "houseParts",
+    "calendar",
+    "settembreAspiranti",
+    "settembreTasks",
+    "settembreCalendar",
+}
 
 
 def get_connection():
@@ -77,6 +108,21 @@ def init_db():
                     (key, json.dumps(default_value)),
                 )
         conn.commit()
+
+        # "people" may already have existed before the "aspirante" role was
+        # introduced, so DEFAULTS above never gets a chance to seed the
+        # shared viewer account for those pre-existing databases. Make sure
+        # it's always present, appending it if missing.
+        row = conn.execute("SELECT value FROM app_state WHERE key = 'people'").fetchone()
+        people = json.loads(row["value"]) if row else []
+        if not any(p.get("role") == "aspirante" for p in people):
+            people.append(ASPIRANTE_VIEWER)
+            conn.execute(
+                "INSERT INTO app_state (key, value) VALUES ('people', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (json.dumps(people),),
+            )
+        conn.commit()
     finally:
         conn.close()
 
@@ -93,6 +139,9 @@ def get_all_state():
         "tasks": data.get("tasks", []),
         "houseParts": data.get("houseParts", []),
         "calendar": data.get("calendar"),
+        "settembreAspiranti": data.get("settembreAspiranti", []),
+        "settembreTasks": data.get("settembreTasks", []),
+        "settembreCalendar": data.get("settembreCalendar"),
     }
 
 

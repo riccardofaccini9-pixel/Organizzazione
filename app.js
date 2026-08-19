@@ -5,13 +5,18 @@ let state = {
   tasks: [],
   houseParts: [],
   calendar: null,
-  isUnlocked: false
+  isUnlocked: false,
+  settembreAspiranti: [],
+  settembreTasks: [],
+  settembreCalendar: null,
+  isSettembreUnlocked: false
 };
 
 // Track whether the task/person/house-part modal is in "add" or "edit" mode
 let editingTaskId = null;
 let editingPersonId = null;
 let editingHousePartId = null;
+let editingSettembreTaskId = null;
 
 // Default seed data (used when no data exists yet) now lives server-side in
 // db.py, so the server always returns real data - no client-side seeding.
@@ -19,8 +24,28 @@ let editingHousePartId = null;
 const DAYS_OF_WEEK = ["venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì", "giovedì"];
 const WIZARD_DAYS = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
 
+// SETTEMBRE: fixed weekly shower-shift grid (never changes - only the names
+// behind each slot, in state.settembreAspiranti, are editable). Uses the
+// same Lun->Dom order as WIZARD_DAYS.
+const SHOWER_TIMES = { mattina: "7:15 - 7:30", pomeriggio: "13:40 - 13:55", sera: "18:35 - 18:50" };
+const SHOWER_SCHEDULE = {
+  mattina: {
+    lunedì: ["u1", "u2", "f1"], martedì: ["u7", "u8"], mercoledì: ["u13", "u1", "f1"],
+    giovedì: ["u6", "u7"], venerdì: ["u12", "u13", "f1"], sabato: ["u5", "u6"], domenica: ["u11", "f1"]
+  },
+  pomeriggio: {
+    lunedì: ["u3", "u4", "f2"], martedì: ["u9", "u10"], mercoledì: ["u2", "u3", "f2"],
+    giovedì: ["u8", "u9"], venerdì: ["u1", "u2", "f2"], sabato: ["u7", "u8"], domenica: ["u12", "f2"]
+  },
+  sera: {
+    lunedì: ["u5", "u6", "f3"], martedì: ["u11", "u12"], mercoledì: ["u4", "u5"],
+    giovedì: ["u10", "u11"], venerdì: ["u3", "u4", "f3"], sabato: ["u9", "u10"], domenica: ["u13", "f3"]
+  }
+};
+
 // WIZARD STATE
 let wizardSelectedAbsent = [];
+let wizardSettembreSelectedAbsent = [];
 
 // DOM ELEMENTS
 const loginView = document.getElementById("login-view");
@@ -28,6 +53,7 @@ const appView = document.getElementById("app-view");
 const loginEmailInput = document.getElementById("login-email");
 const loginPasswordInput = document.getElementById("login-password");
 const loginSubmitBtn = document.getElementById("login-submit-btn");
+const loginAspiranteBtn = document.getElementById("login-aspirante-btn");
 const loginError = document.getElementById("login-error");
 const loginConnectionWarning = document.getElementById("login-connection-warning");
 
@@ -172,18 +198,28 @@ function refreshLiveUI() {
   populateHousePartsTable();
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
+  populateSettembreAspirantiTable();
+  populateSettembreTasksTable();
+  updateSettembreLinkedTasksDropdown();
   if (!state.calendar) {
     state.calendar = createBlankCalendar();
   }
-  // While the calendar is unlocked for direct editing, every poll tick
+  if (!state.settembreCalendar) {
+    state.settembreCalendar = createBlankSettembreCalendar();
+  }
+  // While a calendar is unlocked for direct editing, every poll tick
   // (every POLL_INTERVAL_MS, whether or not anything actually changed
   // remotely) would otherwise rebuild the day/zone <input> elements from
   // scratch - kicking the admin's cursor out of whatever field they're
-  // typing in and discarding the unsaved keystrokes. Skip re-rendering the
-  // calendar until they lock it again (toggleLock already re-renders once
-  // editing is saved), so in-progress edits are never clobbered.
+  // typing in and discarding the unsaved keystrokes. Skip re-rendering each
+  // calendar until it's locked again (toggleLock/toggleSettembreLock
+  // already re-render once editing is saved), so in-progress edits are
+  // never clobbered.
   if (!state.isUnlocked) {
     renderCalendar();
+  }
+  if (!state.isSettembreUnlocked) {
+    renderSettembreCalendar();
   }
 }
 
@@ -200,6 +236,9 @@ function applyServerState(data) {
     priority: (typeof zone.priority === "number") ? zone.priority : 999
   }));
   state.calendar = data.calendar || null;
+  state.settembreAspiranti = data.settembreAspiranti || [];
+  state.settembreTasks = data.settembreTasks || [];
+  state.settembreCalendar = data.settembreCalendar || null;
 }
 
 async function pollServerState() {
@@ -250,6 +289,7 @@ function init() {
 
   // Bind Events
   loginSubmitBtn.addEventListener("click", handleLogin);
+  loginAspiranteBtn.addEventListener("click", handleAspiranteLogin);
   logoutBtn.addEventListener("click", handleLogout);
   loginEmailInput.addEventListener("input", updateLoginBackground);
 
@@ -285,6 +325,23 @@ function init() {
   confirmAbsentBtn.addEventListener("click", goToStep2);
   backToStep1Btn.addEventListener("click", goBackToStep1);
   generateFinalBtn.addEventListener("click", generateCalendar);
+
+  // SETTEMBRE: Lock Toggle
+  document.getElementById("lock-toggle-btn-settembre").addEventListener("click", toggleSettembreLock);
+
+  // SETTEMBRE: Gestione Aspiranti
+  document.getElementById("save-settembre-aspiranti-btn").addEventListener("click", saveSettembreAspiranti);
+
+  // SETTEMBRE: Mansioni Modal Buttons
+  document.getElementById("add-settembre-task-btn").addEventListener("click", () => openAddSettembreTaskModal());
+  document.getElementById("close-modal-settembre-task-btn").addEventListener("click", () => closeModal(document.getElementById("modal-settembre-task")));
+  document.getElementById("save-settembre-task-btn").addEventListener("click", saveSettembreTask);
+
+  // SETTEMBRE: Wizard Buttons
+  document.getElementById("start-wizard-btn-settembre").addEventListener("click", startSettembreWizard);
+  document.getElementById("confirm-absent-btn-settembre").addEventListener("click", goToStep2Settembre);
+  document.getElementById("back-to-step1-btn-settembre").addEventListener("click", goBackToStep1Settembre);
+  document.getElementById("generate-final-btn-settembre").addEventListener("click", generateSettembreCalendar);
 }
 
 // LOGIN BACKGROUND EASTER EGG
@@ -330,6 +387,15 @@ function handleLogin() {
   }
 }
 
+// One-click shortcut for the shared, passwordless "aspirante" viewer
+// account: fills in its known credentials and logs in immediately, so the
+// 16 aspiranti don't need to type/remember an email address.
+function handleAspiranteLogin() {
+  loginEmailInput.value = "aspirante@settembre.local";
+  loginPasswordInput.value = "";
+  handleLogin();
+}
+
 function handleLogout() {
   state.currentUser = null;
   sessionStorage.removeItem("logged_in_user");
@@ -355,6 +421,9 @@ function showApp() {
   populateHousePartsTable();
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
+  populateSettembreAspirantiTable();
+  populateSettembreTasksTable();
+  updateSettembreLinkedTasksDropdown();
 
   if (state.calendar) {
     renderCalendar();
@@ -364,7 +433,15 @@ function showApp() {
     renderCalendar();
   }
 
-  switchTab("tab-visualizzazione");
+  if (state.settembreCalendar) {
+    renderSettembreCalendar();
+  } else {
+    state.settembreCalendar = createBlankSettembreCalendar();
+    renderSettembreCalendar();
+  }
+
+  // The aspirante viewer account only ever sees the Settembre tab
+  switchTab(state.currentUser.role === "aspirante" ? "tab-settembre" : "tab-visualizzazione");
 }
 
 function switchTab(tabId) {
@@ -384,9 +461,12 @@ function switchTab(tabId) {
     }
   });
 
-  // If entering wizard tab, reset to start screen
+  // If entering a wizard tab/section, reset to start screen
   if (tabId === "tab-generazione") {
     resetWizard();
+  }
+  if (tabId === "tab-settembre") {
+    resetSettembreWizard();
   }
 }
 
@@ -570,6 +650,164 @@ function populateTasksTable() {
   });
 }
 
+// SETTEMBRE TASKS (own list, unrelated to the original scheda's tasks;
+// admin-only panel, so action buttons are always shown unconditionally).
+function updateSettembreLinkedTasksDropdown() {
+  const sel = document.getElementById("settembre-task-linked");
+  if (!sel) return;
+  sel.innerHTML = '<option value="none">Nessuna</option>';
+  state.settembreTasks.forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  });
+}
+
+function openAddSettembreTaskModal() {
+  editingSettembreTaskId = null;
+  document.getElementById("modal-settembre-task-header").textContent = "Aggiungi Mansione Settembre";
+  document.getElementById("settembre-task-name").value = "";
+  document.getElementById("settembre-task-min-people").value = "1";
+  document.getElementById("settembre-task-priority").value = "";
+  document.getElementById("settembre-task-target").value = "aspiranti";
+  document.getElementById("settembre-task-exclusive").checked = false;
+  updateSettembreLinkedTasksDropdown();
+  document.getElementById("settembre-task-linked").value = "none";
+  openModal(document.getElementById("modal-settembre-task"));
+}
+
+function editSettembreTask(id) {
+  const task = state.settembreTasks.find(t => t.id === id);
+  if (!task) return;
+
+  editingSettembreTaskId = id;
+  document.getElementById("modal-settembre-task-header").textContent = "Modifica Mansione Settembre";
+  document.getElementById("settembre-task-name").value = task.name;
+  document.getElementById("settembre-task-min-people").value = task.minPeople;
+  document.getElementById("settembre-task-priority").value = task.priority;
+  document.getElementById("settembre-task-target").value = task.target;
+  document.getElementById("settembre-task-exclusive").checked = !!task.exclusive;
+  updateSettembreLinkedTasksDropdown();
+  document.getElementById("settembre-task-linked").value = task.linkedTask;
+  openModal(document.getElementById("modal-settembre-task"));
+}
+
+function saveSettembreTask() {
+  const name = document.getElementById("settembre-task-name").value.trim();
+  const minPeople = parseInt(document.getElementById("settembre-task-min-people").value) || 1;
+  const rawPriority = document.getElementById("settembre-task-priority").value.trim();
+  const target = document.getElementById("settembre-task-target").value;
+  const linkedTask = document.getElementById("settembre-task-linked").value;
+  const exclusive = document.getElementById("settembre-task-exclusive").checked;
+
+  if (!name) {
+    alert("Inserire il nome della mansione!");
+    return;
+  }
+
+  let priority = 999;
+  if (rawPriority !== "" && !isNaN(rawPriority)) {
+    priority = parseInt(rawPriority);
+  }
+
+  if (editingSettembreTaskId) {
+    const task = state.settembreTasks.find(t => t.id === editingSettembreTaskId);
+    task.name = name;
+    task.minPeople = minPeople;
+    task.priority = priority;
+    task.linkedTask = linkedTask === editingSettembreTaskId ? "none" : linkedTask;
+    task.target = target;
+    task.exclusive = exclusive;
+  } else {
+    state.settembreTasks.push({
+      id: "settembre-task-" + Date.now(),
+      name,
+      minPeople,
+      priority,
+      linkedTask,
+      target,
+      exclusive
+    });
+  }
+
+  persistState("settembreTasks", state.settembreTasks);
+  editingSettembreTaskId = null;
+
+  closeModal(document.getElementById("modal-settembre-task"));
+  populateSettembreTasksTable();
+  updateSettembreLinkedTasksDropdown();
+  renderSettembreCalendar();
+}
+
+function deleteSettembreTask(id) {
+  state.settembreTasks = state.settembreTasks.filter(t => t.id !== id);
+  state.settembreTasks.forEach(t => {
+    if (t.linkedTask === id) {
+      t.linkedTask = "none";
+    }
+  });
+  persistState("settembreTasks", state.settembreTasks);
+  populateSettembreTasksTable();
+  updateSettembreLinkedTasksDropdown();
+  renderSettembreCalendar();
+}
+
+function moveSettembreTask(id, direction) {
+  const sorted = [...state.settembreTasks].sort((a, b) => a.priority - b.priority);
+  const idx = sorted.findIndex(t => t.id === id);
+  const targetIdx = idx + direction;
+  if (idx === -1 || targetIdx < 0 || targetIdx >= sorted.length) return;
+
+  [sorted[idx], sorted[targetIdx]] = [sorted[targetIdx], sorted[idx]];
+  sorted.forEach((t, i) => { t.priority = i + 1; });
+
+  persistState("settembreTasks", state.settembreTasks);
+  populateSettembreTasksTable();
+  renderSettembreCalendar();
+}
+
+function settembreTargetLabel(target) {
+  if (target === "aspiranti") return "Aspiranti";
+  if (target === "supervisori") return "Supervisori";
+  return "Entrambi";
+}
+
+function populateSettembreTasksTable() {
+  const tbody = document.getElementById("settembre-tasks-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const sorted = [...state.settembreTasks].sort((a, b) => a.priority - b.priority);
+
+  sorted.forEach((t, idx) => {
+    const linked = state.settembreTasks.find(lt => lt.id === t.linkedTask);
+    const linkedName = linked ? linked.name : "Nessuna";
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(t.name)}</strong>${t.exclusive ? ' <span class="badge badge-admin" title="Chi la svolge non fa altro lo stesso giorno">Esclusiva</span>' : ''}</td>
+      <td>${t.minPeople}</td>
+      <td>${t.priority}</td>
+      <td>${settembreTargetLabel(t.target)}${linked ? ` <span style="color: var(--accent-color);">(collegata a ${escapeHtml(linkedName)})</span>` : ''}</td>
+      <td style="text-align: center; white-space: nowrap;">
+        <button class="action-btn-edit" onclick="moveSettembreTask('${t.id}', -1)" ${idx === 0 ? 'disabled' : ''} title="Sposta su">
+          <svg viewBox="0 0 24 24"><path d="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"/></svg>
+        </button>
+        <button class="action-btn-edit" onclick="moveSettembreTask('${t.id}', 1)" ${idx === sorted.length - 1 ? 'disabled' : ''} title="Sposta giù">
+          <svg viewBox="0 0 24 24"><path d="M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z"/></svg>
+        </button>
+        <button class="action-btn-edit" onclick="editSettembreTask('${t.id}')" title="Modifica">
+          <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
+        </button>
+        <button class="action-btn-danger" onclick="deleteSettembreTask('${t.id}')" title="Elimina">
+          <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function openAddPersonModal() {
   editingPersonId = null;
   personModalHeader.textContent = "Aggiungi Nuovo Utente (Cadetto)";
@@ -599,7 +837,17 @@ function savePerson() {
   const password = personPasswordInput.value.trim();
   const role = personRoleSelect.value;
 
-  if (!name || !email || !password) {
+  // Only one "aspirante" (shared, passwordless Settembre viewer) account may
+  // ever exist - block creating a second one or reassigning the role to a
+  // different person.
+  if (role === "aspirante" && editingPersonId !== "aspirante-default") {
+    alert("Esiste già un profilo Aspirante Visualizzatore: modificalo direttamente invece di crearne un altro.");
+    return;
+  }
+
+  // The aspirante account logs in without a password, so don't require one
+  // when saving it.
+  if (!name || !email || (role !== "aspirante" && !password)) {
     alert("Compilare tutti i campi!");
     return;
   }
@@ -618,7 +866,7 @@ function savePerson() {
     person.name = name;
     person.email = email;
     person.password = password;
-    if (editingPersonId !== "admin-default") {
+    if (editingPersonId !== "admin-default" && editingPersonId !== "aspirante-default") {
       person.role = role;
     }
 
@@ -659,11 +907,23 @@ function refreshCurrentUserUI() {
     document.querySelectorAll(".admin-only").forEach(el => el.style.display = "none");
     lockToggleBtn.style.display = "none";
   }
+
+  // The aspirante viewer account is confined to the Settembre tab: every
+  // other nav item is hidden for it (admin/cadetto still see all of them).
+  if (state.currentUser.role === "aspirante") {
+    document.querySelectorAll(".aspirante-hide").forEach(el => el.style.display = "none");
+  } else {
+    document.querySelectorAll(".aspirante-hide").forEach(el => el.style.display = "");
+  }
 }
 
 function deletePerson(id) {
   if (id === "admin-default") {
     alert("Impossibile cancellare l'account ADMIN predefinito!");
+    return;
+  }
+  if (id === "aspirante-default") {
+    alert("Impossibile cancellare l'account Aspirante predefinito!");
     return;
   }
   state.people = state.people.filter(p => p.id !== id);
@@ -791,7 +1051,32 @@ function populateHousePartsTable() {
 // calendar assignee dropdowns, chore rotation). Other admin accounts created
 // via Gestione Persone still take part normally.
 function getSchedulablePeople() {
-  return state.people.filter(p => p.id !== "admin-default");
+  // Excludes both the bootstrap ADMIN login and the shared "aspirante"
+  // viewer account: neither is a real schedulable individual for the
+  // original scheda.
+  return state.people.filter(p => p.id !== "admin-default" && p.role !== "aspirante");
+}
+
+// SETTEMBRE: "supervisori" = existing admin/cadetto people (managed from
+// Gestione Persone, not from the Settembre tab itself).
+function getSettembreSupervisori() {
+  return getSchedulablePeople().filter(p => p.role === "admin" || p.role === "cadetto");
+}
+
+// SETTEMBRE: combined candidate roster for the shift wizard/generator -
+// supervisori (real people) plus the 16 fixed aspiranti slots, tagged with
+// "kind" so target-based task eligibility ("aspiranti"/"supervisori"/
+// "entrambi") can be checked uniformly.
+function getSettembreRoster() {
+  const supervisori = getSettembreSupervisori().map(p => ({ id: p.id, name: p.name, kind: "supervisore" }));
+  const aspiranti = state.settembreAspiranti.map(a => ({ id: a.id, name: a.name, kind: "aspirante" }));
+  return [...supervisori, ...aspiranti];
+}
+
+function candidateMatchesTarget(candidate, target) {
+  if (target === "supervisori") return candidate.kind === "supervisore";
+  if (target === "aspiranti") return candidate.kind === "aspirante";
+  return true; // "entrambi"
 }
 
 // CALENDAR RENDER & DIRECT EDITING SYSTEM
@@ -820,6 +1105,69 @@ function createBlankCalendar() {
   });
 
   return cal;
+}
+
+// SETTEMBRE CALENDAR RENDER & DIRECT EDITING SYSTEM
+function createBlankSettembreCalendar() {
+  const cal = {
+    meterAssignee: "",
+    porchAssignee: "",
+    weekly: {},
+    exceptions: []
+  };
+
+  WIZARD_DAYS.forEach(day => {
+    cal.weekly[day] = [];
+  });
+
+  return cal;
+}
+
+// SETTEMBRE: fixed shower-shift table. Always read-only (the grid never
+// changes) - resolves each slot id from SHOWER_SCHEDULE into the name
+// currently behind that slot in state.settembreAspiranti.
+function renderShowerTable() {
+  WIZARD_DAYS.forEach(day => {
+    ["mattina", "pomeriggio", "sera"].forEach(shift => {
+      const slotIds = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
+      const names = slotIds.map(slotId => {
+        const aspirante = state.settembreAspiranti.find(a => a.id === slotId);
+        return aspirante ? aspirante.name : slotId;
+      });
+      const td = document.querySelector(`#shower-table-body tr[data-shift="${shift}"] td[data-day="${day}"]`);
+      if (td) td.textContent = names.join(", ") || "-";
+    });
+  });
+}
+
+// SETTEMBRE: admin-only roster management for the 16 fixed slots (U1-13,
+// F1-3). Slot/gender never change - only the name behind each slot.
+function populateSettembreAspirantiTable() {
+  const tbody = document.getElementById("settembre-aspiranti-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  state.settembreAspiranti.forEach(a => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(a.slot)}</strong></td>
+      <td>${a.gender === "U" ? "Maschio" : "Femmina"}</td>
+      <td><input type="text" id="settembre-aspirante-name-${a.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(a.name)}"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function saveSettembreAspiranti() {
+  state.settembreAspiranti.forEach(a => {
+    const input = document.getElementById(`settembre-aspirante-name-${a.id}`);
+    if (input) {
+      a.name = input.value.trim() || a.slot;
+    }
+  });
+  persistState("settembreAspiranti", state.settembreAspiranti);
+  renderShowerTable();
+  renderSettembreCalendar();
+  alert("Nomi aspiranti salvati!");
 }
 
 function toggleLock() {
@@ -1068,6 +1416,142 @@ function renderCalendar() {
     }
   });
 
+}
+
+// SETTEMBRE: lock/unlock direct editing (independent of the original
+// scheda's isUnlocked flag) - admin-only.
+function toggleSettembreLock() {
+  if (state.currentUser.role !== "admin") return;
+
+  state.isSettembreUnlocked = !state.isSettembreUnlocked;
+
+  const lockIconClosedS = document.getElementById("lock-icon-closed-settembre");
+  const lockIconOpenS = document.getElementById("lock-icon-open-settembre");
+  const btnS = document.getElementById("lock-toggle-btn-settembre");
+
+  if (state.isSettembreUnlocked) {
+    lockIconClosedS.style.display = "none";
+    lockIconOpenS.style.display = "block";
+    btnS.classList.add("unlocked");
+  } else {
+    lockIconClosedS.style.display = "block";
+    lockIconOpenS.style.display = "none";
+    btnS.classList.remove("unlocked");
+    saveEditedSettembreCalendarState();
+  }
+
+  renderSettembreCalendar();
+}
+
+function saveEditedSettembreCalendarState() {
+  if (!state.settembreCalendar) return;
+
+  const meterSelect = document.getElementById("edit-settembre-meter-assignee");
+  if (meterSelect) {
+    state.settembreCalendar.meterAssignee = meterSelect.value;
+  }
+
+  const porchSelect = document.getElementById("edit-settembre-porch-assignee");
+  if (porchSelect) {
+    state.settembreCalendar.porchAssignee = porchSelect.value;
+  }
+
+  WIZARD_DAYS.forEach(day => {
+    if (state.settembreCalendar.weekly[day]) {
+      state.settembreCalendar.weekly[day].forEach((taskInst, idx) => {
+        const select = document.getElementById(`edit-settembre-task-${day}-${idx}`);
+        if (select) {
+          state.settembreCalendar.weekly[day][idx].assigned = select.value.split(",").map(s => s.trim()).filter(Boolean);
+        }
+      });
+    }
+  });
+
+  persistState("settembreCalendar", state.settembreCalendar);
+}
+
+// Same free-text + picker pattern as assigneePickerHTML, but sourced from
+// the combined Settembre roster (supervisori + aspiranti) instead of
+// getSchedulablePeople().
+function settembreAssigneePickerHTML(inputId) {
+  const roster = getSettembreRoster();
+  return `<select id="${inputId}-picker" class="input-field" style="margin-top: 4px; padding: 4px 8px; font-size: 12px;" onchange="addNameToAssigneeField('${inputId}', this.value)">
+    <option value="">+ Aggiungi persona...</option>
+    ${roster.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('')}
+  </select>`;
+}
+
+function renderSettembreCalendar() {
+  if (!state.settembreCalendar) return;
+
+  renderShowerTable();
+
+  const roster = getSettembreRoster();
+  const supervisoriRoster = roster.filter(c => c.kind === "supervisore");
+  const aspirantiRoster = roster.filter(c => c.kind === "aspirante");
+
+  // RENDER METER READING (supervisori only)
+  if (state.isSettembreUnlocked) {
+    const selectHTML = `<select id="edit-settembre-meter-assignee" class="meter-select">
+      <option value="">Nessuno</option>
+      ${supervisoriRoster.map(c => `<option value="${escapeHtml(c.name)}" ${state.settembreCalendar.meterAssignee === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>`;
+    document.getElementById("settembre-meter-display-container").innerHTML = selectHTML;
+  } else {
+    document.getElementById("settembre-meter-display-container").innerHTML = `<span class="meter-value">${escapeHtml(state.settembreCalendar.meterAssignee) || 'Non assegnato'}</span>`;
+  }
+
+  // RENDER PORCH CLEANING (aspiranti only)
+  if (state.isSettembreUnlocked) {
+    const selectHTML = `<select id="edit-settembre-porch-assignee" class="meter-select">
+      <option value="">Nessuno</option>
+      ${aspirantiRoster.map(c => `<option value="${escapeHtml(c.name)}" ${state.settembreCalendar.porchAssignee === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>`;
+    document.getElementById("settembre-porch-display-container").innerHTML = selectHTML;
+  } else {
+    document.getElementById("settembre-porch-display-container").innerHTML = `<span class="meter-value">${escapeHtml(state.settembreCalendar.porchAssignee) || 'Non assegnato'}</span>`;
+  }
+
+  // RENDER WEEKLY TASKS
+  function settembreTaskPriority(taskId) {
+    const task = state.settembreTasks.find(t => t.id === taskId);
+    return task ? task.priority : 999;
+  }
+
+  WIZARD_DAYS.forEach(day => {
+    const col = document.querySelector(`#settembre-weekly-container .day-column[data-day="${day}"]`);
+    if (!col) return;
+    const list = col.querySelector(".day-tasks-list");
+    list.innerHTML = "";
+
+    if (state.settembreCalendar.weekly[day]) {
+      state.settembreCalendar.weekly[day].sort((a, b) => settembreTaskPriority(a.taskId) - settembreTaskPriority(b.taskId));
+    }
+
+    const dayTasks = state.settembreCalendar.weekly[day] || [];
+    dayTasks.forEach((taskInst, idx) => {
+      const item = document.createElement("div");
+      item.className = "day-task-item";
+
+      let assigneeHTML = "";
+      if (state.isSettembreUnlocked) {
+        assigneeHTML = `<input type="text" id="edit-settembre-task-${day}-${idx}" class="day-task-assignee-edit" value="${escapeHtml(taskInst.assigned.join(', '))}" placeholder="Nomi separati da virgola">
+          ${settembreAssigneePickerHTML(`edit-settembre-task-${day}-${idx}`)}`;
+      } else {
+        assigneeHTML = `<div class="day-task-assignee">${escapeHtml(taskInst.assigned.join(', ')) || 'Non assegnato'}</div>`;
+      }
+
+      item.innerHTML = `
+        <div class="day-task-name">${escapeHtml(taskInst.name)}</div>
+        ${assigneeHTML}
+      `;
+      list.appendChild(item);
+    });
+
+    if (dayTasks.length === 0) {
+      list.innerHTML = `<div style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">Nessuna attività generata</div>`;
+    }
+  });
 }
 
 // "COSA FACCIO OGGI?" SEARCH
@@ -1643,6 +2127,317 @@ function generateCalendar() {
   renderCalendar();
   switchTab("tab-visualizzazione");
   alert("Calendario generato con successo!");
+}
+
+// SETTEMBRE GENERATION WIZARD LOGIC
+function resetSettembreWizard() {
+  document.getElementById("gen-step-init-settembre").classList.add("active");
+  document.getElementById("gen-step-absent-settembre").classList.remove("active");
+  document.getElementById("gen-step-details-settembre").classList.remove("active");
+  wizardSettembreSelectedAbsent = [];
+  document.getElementById("step2-present-list-settembre").style.display = "none";
+}
+
+function startSettembreWizard() {
+  document.getElementById("gen-step-init-settembre").classList.remove("active");
+  document.getElementById("gen-step-absent-settembre").classList.add("active");
+
+  const listEl = document.getElementById("wizard-people-list-settembre");
+  listEl.innerHTML = "";
+  const roster = getSettembreRoster();
+  const confirmBtn = document.getElementById("confirm-absent-btn-settembre");
+
+  if (roster.length === 0) {
+    listEl.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Aggiungi prima aspiranti o supervisori!</p>`;
+    confirmBtn.disabled = true;
+    return;
+  }
+  confirmBtn.disabled = false;
+
+  roster.forEach(c => {
+    const card = document.createElement("label");
+    card.className = "checkbox-card";
+    card.innerHTML = `
+      <input type="checkbox" data-person-id="${c.id}">
+      <span class="checkbox-card-label">${escapeHtml(c.name)} <small style="color: var(--text-muted);">(${c.kind === 'aspirante' ? 'Aspirante' : 'Supervisore'})</small></span>
+    `;
+    listEl.appendChild(card);
+  });
+}
+
+function goToStep2Settembre() {
+  wizardSettembreSelectedAbsent = [];
+  const roster = getSettembreRoster();
+  const checkedBoxes = document.querySelectorAll('#wizard-people-list-settembre input[type="checkbox"]:checked');
+
+  checkedBoxes.forEach(cb => {
+    const pId = cb.getAttribute("data-person-id");
+    const candidate = roster.find(c => c.id === pId);
+    if (candidate) {
+      wizardSettembreSelectedAbsent.push(candidate);
+    }
+  });
+
+  document.getElementById("gen-step-absent-settembre").classList.remove("active");
+  document.getElementById("gen-step-details-settembre").classList.add("active");
+
+  const absentIds = new Set(wizardSettembreSelectedAbsent.map(c => c.id));
+  const presentCandidates = roster.filter(c => !absentIds.has(c.id));
+  const presentListEl = document.getElementById("step2-present-list-settembre");
+
+  if (presentCandidates.length > 0) {
+    presentListEl.innerHTML = `<strong>Presenti tutta la settimana (nessuna azione richiesta):</strong> ${presentCandidates.map(c => escapeHtml(c.name)).join(', ')}`;
+    presentListEl.style.display = "block";
+  } else {
+    presentListEl.innerHTML = `<strong>Attenzione:</strong> tutti sono stati selezionati come almeno parzialmente assenti al Passo 1.`;
+    presentListEl.style.display = "block";
+  }
+
+  const tbody = document.getElementById("absence-table-body-settembre");
+  tbody.innerHTML = "";
+  if (wizardSettembreSelectedAbsent.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Nessuna assenza selezionata al Passo 1: come indicato sopra, tutti saranno schedulati come presenti tutta la settimana. Clicca su Genera Turni Settembre per completare.</td></tr>`;
+    return;
+  }
+
+  wizardSettembreSelectedAbsent.forEach(c => {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-person-id", c.id);
+
+    let daysHTML = "";
+    WIZARD_DAYS.forEach(day => {
+      daysHTML += `<td><input type="checkbox" data-day="${day}"></td>`;
+    });
+
+    tr.innerHTML = `
+      <td>${escapeHtml(c.name)}</td>
+      ${daysHTML}
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function goBackToStep1Settembre() {
+  document.getElementById("gen-step-details-settembre").classList.remove("active");
+  document.getElementById("gen-step-absent-settembre").classList.add("active");
+}
+
+// SETTEMBRE CALENDAR GENERATION ALGORITHM - same fairness-balancing pattern
+// as generateCalendar() above, but the roster is the combined
+// supervisori+aspiranti list and each task's candidate pool is filtered by
+// its "target" (aspiranti/supervisori/entrambi). There is no house-cleaning
+// zones / evening-check / laundry-shift equivalent here - the shower table
+// is fixed (never generated), and only meterAssignee/porchAssignee plus the
+// admin-defined weekly tasks are generated.
+function generateSettembreCalendar() {
+  const newCalendar = createBlankSettembreCalendar();
+  const roster = getSettembreRoster();
+
+  const absences = {}; // { candidateId: [absentDays] }
+  if (wizardSettembreSelectedAbsent.length > 0) {
+    const rows = document.querySelectorAll("#absence-table-body-settembre tr[data-person-id]");
+    rows.forEach(row => {
+      const pId = row.getAttribute("data-person-id");
+      const presentBoxes = row.querySelectorAll('input[type="checkbox"]:checked');
+      const presentDays = new Set(Array.from(presentBoxes).map(box => box.getAttribute("data-day").toLowerCase()));
+      absences[pId] = WIZARD_DAYS.filter(d => !presentDays.has(d));
+    });
+  }
+
+  const fullyPresentCandidates = [];
+  const partiallyAbsentCandidates = []; // { person, absentDays, presentDays }
+
+  roster.forEach(c => {
+    const personAbsences = absences[c.id] || [];
+    if (personAbsences.length === 7) {
+      // Fully absent - excluded entirely
+      return;
+    } else if (personAbsences.length > 0) {
+      const presentDays = WIZARD_DAYS.filter(d => !personAbsences.includes(d));
+      partiallyAbsentCandidates.push({ person: c, absentDays: personAbsences, presentDays });
+    } else {
+      fullyPresentCandidates.push(c);
+    }
+  });
+
+  const activeCandidates = [...fullyPresentCandidates, ...partiallyAbsentCandidates.map(item => item.person)];
+
+  if (activeCandidates.length === 0) {
+    alert("Errore: tutti sono assenti per l'intera settimana! Impossibile generare i turni Settembre.");
+    return;
+  }
+
+  function isCandidatePresent(c, dayName) {
+    const cAbsences = absences[c.id] || [];
+    return !cAbsences.includes(dayName.toLowerCase());
+  }
+  function getPresentCandidatesForDay(dayName) {
+    return activeCandidates.filter(c => isCandidatePresent(c, dayName));
+  }
+
+  const loadCounts = {};
+  activeCandidates.forEach(c => { loadCounts[c.id] = 0; });
+
+  const sortedTasks = [...state.settembreTasks].sort((a, b) => a.priority - b.priority);
+  const taskAssignmentCounts = {};
+  sortedTasks.forEach(t => {
+    taskAssignmentCounts[t.id] = {};
+    activeCandidates.forEach(c => { taskAssignmentCounts[t.id][c.id] = 0; });
+  });
+
+  WIZARD_DAYS.forEach(day => {
+    newCalendar.weekly[day] = [];
+    const dailyRosterAll = getPresentCandidatesForDay(day);
+    if (dailyRosterAll.length === 0) return;
+
+    const dailyAssignedIds = new Set();
+    const dailyHardExcluded = new Set();
+    const dailyAssignedByPriority = {};
+
+    sortedTasks.forEach(task => {
+      if (task.linkedTask !== "none") return;
+
+      if (!dailyAssignedByPriority[task.priority]) {
+        dailyAssignedByPriority[task.priority] = new Set();
+      }
+      const usedForThisPriority = dailyAssignedByPriority[task.priority];
+
+      const linkedChildrenForMinP = sortedTasks.filter(t => t.linkedTask === task.id);
+      const minP = task.minPeople;
+      const assignedCandidates = [];
+      const eligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, task.target));
+
+      for (let i = 0; i < minP; i++) {
+        let candidates = eligiblePool.filter(c => !assignedCandidates.includes(c) && !dailyHardExcluded.has(c.id) && !usedForThisPriority.has(c.id));
+        if (candidates.length === 0) {
+          candidates = eligiblePool.filter(c => !assignedCandidates.includes(c) && !dailyHardExcluded.has(c.id));
+        }
+        if (candidates.length === 0) break;
+
+        candidates.sort((a, b) => {
+          const aToday = dailyAssignedIds.has(a.id) ? 1 : 0;
+          const bToday = dailyAssignedIds.has(b.id) ? 1 : 0;
+          if (aToday !== bToday) return aToday - bToday;
+
+          const aTaskCount = taskAssignmentCounts[task.id][a.id];
+          const bTaskCount = taskAssignmentCounts[task.id][b.id];
+          if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+
+          return loadCounts[a.id] - loadCounts[b.id];
+        });
+
+        const selected = candidates[0];
+        assignedCandidates.push(selected);
+        dailyAssignedIds.add(selected.id);
+        usedForThisPriority.add(selected.id);
+        taskAssignmentCounts[task.id][selected.id]++;
+        loadCounts[selected.id]++;
+      }
+
+      if (task.exclusive) {
+        assignedCandidates.forEach(c => dailyHardExcluded.add(c.id));
+      }
+
+      newCalendar.weekly[day].push({
+        taskId: task.id,
+        name: task.name,
+        assigned: assignedCandidates.map(c => c.name)
+      });
+
+      // Linked child tasks reuse the parent's assignees only when they share
+      // the same target pool (otherwise there's nobody eligible to reuse);
+      // otherwise - or when the parent's group runs out - top up from the
+      // child's own eligible pool.
+      let parentPoolPointer = 0;
+      linkedChildrenForMinP.forEach(child => {
+        const childEligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, child.target));
+        let childAssigned = [];
+        if (child.target === task.target) {
+          childAssigned = assignedCandidates.slice(parentPoolPointer, parentPoolPointer + child.minPeople);
+          parentPoolPointer += childAssigned.length;
+        }
+
+        while (childAssigned.length < child.minPeople) {
+          const candidates = childEligiblePool.filter(c => !childAssigned.includes(c) && !dailyHardExcluded.has(c.id));
+          if (candidates.length === 0) break;
+
+          candidates.sort((a, b) => {
+            const aToday = dailyAssignedIds.has(a.id) ? 1 : 0;
+            const bToday = dailyAssignedIds.has(b.id) ? 1 : 0;
+            if (aToday !== bToday) return aToday - bToday;
+            return loadCounts[a.id] - loadCounts[b.id];
+          });
+
+          const selected = candidates[0];
+          childAssigned.push(selected);
+          dailyAssignedIds.add(selected.id);
+        }
+
+        if (child.exclusive) {
+          childAssigned.forEach(c => dailyHardExcluded.add(c.id));
+        }
+
+        childAssigned.forEach(c => { loadCounts[c.id]++; });
+
+        newCalendar.weekly[day].push({
+          taskId: child.id,
+          name: child.name,
+          assigned: childAssigned.map(c => c.name)
+        });
+      });
+    });
+  });
+
+  // LETTURA CONTATORI - supervisori only, once a week
+  const fullyPresentSupervisori = fullyPresentCandidates.filter(c => c.kind === "supervisore");
+  let meterCandidate = null;
+  if (fullyPresentSupervisori.length > 0) {
+    fullyPresentSupervisori.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
+    meterCandidate = fullyPresentSupervisori[0];
+  } else {
+    const sortedPartialSupervisori = partiallyAbsentCandidates
+      .filter(item => item.person.kind === "supervisore")
+      .sort((a, b) => {
+        if (a.presentDays.length !== b.presentDays.length) {
+          return b.presentDays.length - a.presentDays.length;
+        }
+        return loadCounts[a.person.id] - loadCounts[b.person.id];
+      });
+    meterCandidate = sortedPartialSupervisori[0]?.person || null;
+  }
+  if (meterCandidate) {
+    newCalendar.meterAssignee = meterCandidate.name;
+    loadCounts[meterCandidate.id] += 2;
+  }
+
+  // PULIZIA PORTICO - aspiranti only, once a week
+  const fullyPresentAspiranti = fullyPresentCandidates.filter(c => c.kind === "aspirante");
+  let porchCandidate = null;
+  if (fullyPresentAspiranti.length > 0) {
+    fullyPresentAspiranti.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
+    porchCandidate = fullyPresentAspiranti[0];
+  } else {
+    const sortedPartialAspiranti = partiallyAbsentCandidates
+      .filter(item => item.person.kind === "aspirante")
+      .sort((a, b) => {
+        if (a.presentDays.length !== b.presentDays.length) {
+          return b.presentDays.length - a.presentDays.length;
+        }
+        return loadCounts[a.person.id] - loadCounts[b.person.id];
+      });
+    porchCandidate = sortedPartialAspiranti[0]?.person || null;
+  }
+  if (porchCandidate) {
+    newCalendar.porchAssignee = porchCandidate.name;
+    loadCounts[porchCandidate.id] += 2;
+  }
+
+  state.settembreCalendar = newCalendar;
+  persistState("settembreCalendar", newCalendar);
+
+  renderSettembreCalendar();
+  switchTab("tab-settembre");
+  alert("Turni Settembre generati con successo!");
 }
 
 // UTILITY FUNCTIONS

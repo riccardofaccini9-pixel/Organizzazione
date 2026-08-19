@@ -25,13 +25,17 @@
       
       <div class="input-group">
         <label class="input-label" for="login-password">Password</label>
-        <input type="password" id="login-password" class="input-field" placeholder="••••••••" required>
+        <input type="password" id="login-password" class="input-field" placeholder="•••••••• (lascia vuoto per il profilo Aspirante)">
       </div>
-      
+
       <button id="login-submit-btn" class="btn btn-primary">
         Accedi
       </button>
-      
+
+      <button id="login-aspirante-btn" type="button" class="btn btn-secondary" style="margin-top: 10px;">
+        Accedi come Aspirante (scheda Settembre)
+      </button>
+
       <div id="login-error" class="error-message">Credenziali non valide</div>
       <div id="login-connection-warning" class="error-message" style="display: none; color: var(--warning-color);">
         Connessione al database lenta o non riuscita. Puoi comunque provare ad accedere, ma i dati potrebbero non essere aggiornati. Controlla la connessione e ricarica la pagina.
@@ -366,6 +370,246 @@
         </div>
       </section>
 
+      <!-- TAB: SETTEMBRE -->
+      <section id="tab-settembre" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Settembre</h2>
+          <div class="header-actions">
+            <!-- Lock button, visible only for Admin -->
+            <button id="lock-toggle-btn-settembre" class="lock-toggle-btn admin-only" title="Modifica assegnazioni">
+              <svg id="lock-icon-closed-settembre" viewBox="0 0 24 24">
+                <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" />
+              </svg>
+              <svg id="lock-icon-open-settembre" viewBox="0 0 24 24" style="display: none;">
+                <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8H17V6A5,5 0 0,0 12,1A5,5 0 0,0 7,6H9A3,3 0 0,1 12,3A3,3 0 0,1 15,6V8H6A2,2 0 0,0 4,10V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V10A2,2 0 0,0 18,8Z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- TURNI DOCCE (fixed weekly grid) -->
+        <div class="card">
+          <h3 class="card-title">Turni Docce</h3>
+          <div class="table-responsive">
+            <table class="laundry-table">
+              <thead>
+                <tr>
+                  <th>Turno</th>
+                  <th>Lun</th>
+                  <th>Mar</th>
+                  <th>Mer</th>
+                  <th>Giov</th>
+                  <th>Ven</th>
+                  <th>Sab</th>
+                  <th>Dom</th>
+                </tr>
+              </thead>
+              <tbody id="shower-table-body">
+                <tr data-shift="mattina">
+                  <td class="laundry-shift-label">Mattina<br><small>7:15 - 7:30</small></td>
+                  <td data-day="lunedì">-</td>
+                  <td data-day="martedì">-</td>
+                  <td data-day="mercoledì">-</td>
+                  <td data-day="giovedì">-</td>
+                  <td data-day="venerdì">-</td>
+                  <td data-day="sabato">-</td>
+                  <td data-day="domenica">-</td>
+                </tr>
+                <tr data-shift="pomeriggio">
+                  <td class="laundry-shift-label">Pomeriggio<br><small>13:40 - 13:55</small></td>
+                  <td data-day="lunedì">-</td>
+                  <td data-day="martedì">-</td>
+                  <td data-day="mercoledì">-</td>
+                  <td data-day="giovedì">-</td>
+                  <td data-day="venerdì">-</td>
+                  <td data-day="sabato">-</td>
+                  <td data-day="domenica">-</td>
+                </tr>
+                <tr data-shift="sera">
+                  <td class="laundry-shift-label">Sera<br><small>18:35 - 18:50</small></td>
+                  <td data-day="lunedì">-</td>
+                  <td data-day="martedì">-</td>
+                  <td data-day="mercoledì">-</td>
+                  <td data-day="giovedì">-</td>
+                  <td data-day="venerdì">-</td>
+                  <td data-day="sabato">-</td>
+                  <td data-day="domenica">-</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- METER READING + PORCH CLEANING -->
+        <div class="card meter-card">
+          <h3 class="card-title">Lettura Contatori (Supervisori) &amp; Pulizia Portico (Aspiranti)</h3>
+          <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+            <div>
+              <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Lettura Contatori</div>
+              <div id="settembre-meter-display-container">
+                <span id="settembre-meter-assignee-text" class="meter-value">-</span>
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Pulizia Portico</div>
+              <div id="settembre-porch-display-container">
+                <span id="settembre-porch-assignee-text" class="meter-value">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WEEKLY TASKS -->
+        <div class="card">
+          <h3 class="card-title">Mansioni Settimanali</h3>
+          <div id="settembre-weekly-container" class="calendar-days-container">
+            <div class="day-column" data-day="lunedì">
+              <div class="day-header">lunedì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="martedì">
+              <div class="day-header">martedì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="mercoledì">
+              <div class="day-header">mercoledì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="giovedì">
+              <div class="day-header">giovedì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="venerdì">
+              <div class="day-header">venerdì</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="sabato">
+              <div class="day-header">sabato</div>
+              <div class="day-tasks-list"></div>
+            </div>
+            <div class="day-column" data-day="domenica">
+              <div class="day-header">domenica</div>
+              <div class="day-tasks-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADMIN: GESTIONE ASPIRANTI (fixed 16-slot roster, name-only edit) -->
+        <div class="card admin-only">
+          <h3 class="card-title">Gestione Aspiranti (16 slot fissi)</h3>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Slot</th>
+                  <th>Genere</th>
+                  <th>Nome</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-aspiranti-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-actions" style="justify-content: flex-end; margin-top: 12px;">
+            <button id="save-settembre-aspiranti-btn" class="btn btn-primary" style="width: auto;">Salva Nomi</button>
+          </div>
+        </div>
+
+        <!-- ADMIN: GESTIONE MANSIONI SETTEMBRE -->
+        <div class="card admin-only">
+          <div class="page-header" style="margin-bottom: 16px;">
+            <h3 class="card-title" style="margin-bottom: 0;">Gestione Mansioni Settembre</h3>
+            <div class="header-actions">
+              <button id="add-settembre-task-btn" class="add-btn">
+                <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                  <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                </svg>
+                Aggiungi Mansione
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome Attività</th>
+                  <th>Min Persone</th>
+                  <th>Priorità</th>
+                  <th>Assegnata a</th>
+                  <th style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-tasks-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ADMIN: GENERAZIONE TURNI SETTEMBRE -->
+        <div class="card admin-only">
+          <h3 class="card-title">Genera Turni Settembre</h3>
+
+          <div id="gen-step-init-settembre" class="wizard-container">
+            <button id="start-wizard-btn-settembre" class="btn-generate-main">Genera turni Settembre</button>
+          </div>
+
+          <div id="gen-step-absent-settembre" class="wizard-step">
+            <h3 class="card-title">Passo 1: Seleziona gli Assenti (Aspiranti e Supervisori)</h3>
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+              Seleziona chi sarà assente (parzialmente o totalmente) questa settimana. Se questa settimana sono tutti presenti, non selezionare nessuno.
+            </p>
+
+            <div id="wizard-people-list-settembre" class="people-checkbox-grid">
+              <!-- Dynamically populated -->
+            </div>
+
+            <div class="wizard-footer">
+              <button id="confirm-absent-btn-settembre" class="btn btn-primary" style="width: auto; padding-left: 30px; padding-right: 30px;">
+                Conferma Assenti
+              </button>
+            </div>
+          </div>
+
+          <div id="gen-step-details-settembre" class="wizard-step">
+            <h3 class="card-title">Passo 2: Giorni di Presenza Specifici</h3>
+            <p style="color: var(--text-muted); margin-bottom: 16px;">
+              Spunta solo i giorni in cui la persona sarà presente.
+            </p>
+
+            <div id="step2-present-list-settembre" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; font-size: 14px; display: none;"></div>
+
+            <div class="table-responsive">
+              <table class="absence-table">
+                <thead>
+                  <tr>
+                    <th>Persona</th>
+                    <th>Lunedì</th>
+                    <th>Martedì</th>
+                    <th>Mercoledì</th>
+                    <th>Giovedì</th>
+                    <th>Venerdì</th>
+                    <th>Sabato</th>
+                    <th>Domenica</th>
+                  </tr>
+                </thead>
+                <tbody id="absence-table-body-settembre">
+                  <!-- Dynamically populated with rows for selected people -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="wizard-footer" style="justify-content: space-between; align-items: center;">
+              <button id="back-to-step1-btn-settembre" class="btn btn-secondary" style="width: auto;">Indietro</button>
+              <button id="generate-final-btn-settembre" class="btn btn-success" style="width: auto; padding-left: 30px; padding-right: 30px;">
+                Genera Turni Settembre
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <!-- SIDEBAR NAVIGATION (Right) -->
@@ -382,12 +626,20 @@
 
         <nav>
           <ul class="nav-menu">
-            <li class="nav-item active" data-tab="tab-visualizzazione">
+            <li class="nav-item active aspirante-hide" data-tab="tab-visualizzazione">
               <button>
                 <svg viewBox="0 0 24 24">
                   <path d="M9,10H7V12H9V10M13,10H11V12H13V10M17,10H15V12H17V10M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V8H19V19Z" />
                 </svg>
                 <span>Visualizzazione</span>
+              </button>
+            </li>
+            <li class="nav-item" data-tab="tab-settembre">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z" />
+                </svg>
+                <span>Settembre</span>
               </button>
             </li>
             <li class="nav-item admin-only" data-tab="tab-generazione">
@@ -506,12 +758,64 @@
         <select id="person-role" class="input-field">
           <option value="cadetto">Cadetto</option>
           <option value="admin">Admin</option>
+          <option value="aspirante">Aspirante (visualizzatore Settembre)</option>
         </select>
       </div>
 
       <div class="modal-actions">
         <button id="close-modal-person-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
         <button id="save-person-btn" class="btn btn-primary" style="width: auto;">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT SETTEMBRE TASK -->
+  <div id="modal-settembre-task" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="modal-settembre-task-header" class="modal-header">Aggiungi Mansione Settembre</h3>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-task-name">Nome Attività</label>
+        <input type="text" id="settembre-task-name" class="input-field" placeholder="Es. Pulizia Sala Comune" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-task-min-people">Numero Minimo Persone</label>
+        <input type="number" id="settembre-task-min-people" class="input-field" value="1" min="1" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-task-priority">Priorità (1 = Max, 999 = Min)</label>
+        <input type="text" id="settembre-task-priority" class="input-field" placeholder="Es. 1 (o inserisci testo per 999)">
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-task-target">Assegnata a</label>
+        <select id="settembre-task-target" class="input-field">
+          <option value="aspiranti">Aspiranti</option>
+          <option value="supervisori">Supervisori</option>
+          <option value="entrambi">Entrambi</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-task-linked">Attività Collegata</label>
+        <select id="settembre-task-linked" class="input-field">
+          <option value="none">Nessuna</option>
+          <!-- Populate dynamically with existing Settembre tasks -->
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+          <input type="checkbox" id="settembre-task-exclusive" style="width: 17px; height: 17px; accent-color: var(--accent-color); cursor: pointer;">
+          Chi svolge questa mansione non può fare altro lo stesso giorno
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-modal-settembre-task-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
+        <button id="save-settembre-task-btn" class="btn btn-primary" style="width: auto;">Salva</button>
       </div>
     </div>
   </div>

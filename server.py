@@ -16,6 +16,18 @@ app = Flask(__name__)
 db.init_db()
 
 
+@app.after_request
+def add_no_cache_headers(response):
+    # The frontend (index.html/app.js/style.css) changes often as the app
+    # evolves, and browsers otherwise cache these aggressively (heuristic
+    # caching based on Last-Modified) - leading to a stale app.js still
+    # running after a deploy even though index.html itself updated. Force
+    # revalidation on every request instead of disabling caching outright:
+    # unchanged files still get a cheap 304 via conditional GET.
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.route("/api/state", methods=["GET"])
 def get_state():
     return jsonify(db.get_all_state())

@@ -8,6 +8,7 @@ let state = {
   isUnlocked: false,
   settembreAspiranti: [],
   settembreTasks: [],
+  settembreHouseParts: [],
   settembreCalendar: null,
   isSettembreUnlocked: false
 };
@@ -17,6 +18,7 @@ let editingTaskId = null;
 let editingPersonId = null;
 let editingHousePartId = null;
 let editingSettembreTaskId = null;
+let editingSettembreHousePartId = null;
 
 // Default seed data (used when no data exists yet) now lives server-side in
 // db.py, so the server always returns real data - no client-side seeding.
@@ -201,6 +203,7 @@ function refreshLiveUI() {
   populateSettembreAspirantiTable();
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
+  populateSettembreHousePartsTable();
   if (!state.calendar) {
     state.calendar = createBlankCalendar();
   }
@@ -238,6 +241,12 @@ function applyServerState(data) {
   state.calendar = data.calendar || null;
   state.settembreAspiranti = data.settembreAspiranti || [];
   state.settembreTasks = data.settembreTasks || [];
+  state.settembreHouseParts = (data.settembreHouseParts || []).map(zone => ({
+    id: zone.id,
+    name: zone.name,
+    minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
+    priority: (typeof zone.priority === "number") ? zone.priority : 999
+  }));
   state.settembreCalendar = data.settembreCalendar || null;
 }
 
@@ -337,6 +346,11 @@ function init() {
   document.getElementById("close-modal-settembre-task-btn").addEventListener("click", () => closeModal(document.getElementById("modal-settembre-task")));
   document.getElementById("save-settembre-task-btn").addEventListener("click", saveSettembreTask);
 
+  // SETTEMBRE: Zone di Pulizia Modal Buttons
+  document.getElementById("add-settembre-house-part-btn").addEventListener("click", () => openAddSettembreHousePartModal());
+  document.getElementById("close-modal-settembre-house-part-btn").addEventListener("click", () => closeModal(document.getElementById("modal-settembre-house-part")));
+  document.getElementById("save-settembre-house-part-btn").addEventListener("click", saveSettembreHousePart);
+
   // SETTEMBRE: Wizard Buttons
   document.getElementById("start-wizard-btn-settembre").addEventListener("click", startSettembreWizard);
   document.getElementById("confirm-absent-btn-settembre").addEventListener("click", goToStep2Settembre);
@@ -424,6 +438,7 @@ function showApp() {
   populateSettembreAspirantiTable();
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
+  populateSettembreHousePartsTable();
 
   if (state.calendar) {
     renderCalendar();
@@ -810,6 +825,94 @@ function populateSettembreTasksTable() {
   });
 }
 
+// SETTEMBRE HOUSE CLEANING ZONES - own list, same shape/fields as the
+// original scheda's houseParts (no "target" field: like the original,
+// zones are open to the whole combined roster rather than a specific pool).
+function openAddSettembreHousePartModal() {
+  editingSettembreHousePartId = null;
+  document.getElementById("modal-settembre-house-part-header").textContent = "Aggiungi Zona di Pulizia";
+  document.getElementById("settembre-house-part-name").value = "";
+  document.getElementById("settembre-house-part-min-people").value = "1";
+  document.getElementById("settembre-house-part-priority").value = "";
+  openModal(document.getElementById("modal-settembre-house-part"));
+}
+
+function editSettembreHousePart(id) {
+  const zone = state.settembreHouseParts.find(z => z.id === id);
+  if (!zone) return;
+
+  editingSettembreHousePartId = id;
+  document.getElementById("modal-settembre-house-part-header").textContent = "Modifica Zona di Pulizia";
+  document.getElementById("settembre-house-part-name").value = zone.name;
+  document.getElementById("settembre-house-part-min-people").value = zone.minPeople;
+  document.getElementById("settembre-house-part-priority").value = zone.priority;
+  openModal(document.getElementById("modal-settembre-house-part"));
+}
+
+function saveSettembreHousePart() {
+  const name = document.getElementById("settembre-house-part-name").value.trim();
+  const minPeople = parseInt(document.getElementById("settembre-house-part-min-people").value) || 1;
+  const rawPriority = document.getElementById("settembre-house-part-priority").value.trim();
+
+  if (!name) {
+    alert("Inserire il nome della zona!");
+    return;
+  }
+
+  let priority = 999;
+  if (rawPriority !== "" && !isNaN(rawPriority)) {
+    priority = parseInt(rawPriority);
+  }
+
+  if (editingSettembreHousePartId) {
+    const zone = state.settembreHouseParts.find(z => z.id === editingSettembreHousePartId);
+    zone.name = name;
+    zone.minPeople = minPeople;
+    zone.priority = priority;
+  } else {
+    state.settembreHouseParts.push({ id: "settembre-hp-" + Date.now(), name, minPeople, priority });
+  }
+
+  persistState("settembreHouseParts", state.settembreHouseParts);
+  editingSettembreHousePartId = null;
+
+  closeModal(document.getElementById("modal-settembre-house-part"));
+  populateSettembreHousePartsTable();
+  renderSettembreCalendar();
+}
+
+function deleteSettembreHousePart(id) {
+  state.settembreHouseParts = state.settembreHouseParts.filter(z => z.id !== id);
+  persistState("settembreHouseParts", state.settembreHouseParts);
+  populateSettembreHousePartsTable();
+  renderSettembreCalendar();
+}
+
+function populateSettembreHousePartsTable() {
+  const tbody = document.getElementById("settembre-house-parts-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const sorted = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
+
+  sorted.forEach(zone => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(zone.name)}</strong></td>
+      <td>${zone.minPeople}</td>
+      <td>${zone.priority}</td>
+      <td style="text-align: center;">
+        <button class="action-btn-edit" onclick="editSettembreHousePart('${zone.id}')">
+          <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
+        </button>
+        <button class="action-btn-danger" onclick="deleteSettembreHousePart('${zone.id}')">
+          <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function openAddPersonModal() {
   editingPersonId = null;
   personModalHeader.textContent = "Aggiungi Nuovo Utente (Cadetto)";
@@ -1145,9 +1248,14 @@ function createBlankSettembreCalendar() {
   const cal = {
     meterAssignee: "",
     porchAssignee: "",
+    houseCleaning: {},
     weekly: {},
     exceptions: []
   };
+
+  state.settembreHouseParts.forEach(zone => {
+    cal.houseCleaning[zone.id] = { assigned: [], helpers: [] };
+  });
 
   WIZARD_DAYS.forEach(day => {
     cal.weekly[day] = [];
@@ -1489,6 +1597,16 @@ function saveEditedSettembreCalendarState() {
     state.settembreCalendar.porchAssignee = porchSelect.value;
   }
 
+  state.settembreHouseParts.forEach(zone => {
+    const input = document.getElementById(`edit-settembre-house-${zone.id}`);
+    if (input) {
+      if (!state.settembreCalendar.houseCleaning[zone.id]) {
+        state.settembreCalendar.houseCleaning[zone.id] = { assigned: [], helpers: [] };
+      }
+      state.settembreCalendar.houseCleaning[zone.id].assigned = input.value.split(",").map(s => s.trim()).filter(Boolean);
+    }
+  });
+
   WIZARD_DAYS.forEach(day => {
     if (state.settembreCalendar.weekly[day]) {
       state.settembreCalendar.weekly[day].forEach((taskInst, idx) => {
@@ -1543,6 +1661,43 @@ function renderSettembreCalendar() {
     document.getElementById("settembre-porch-display-container").innerHTML = selectHTML;
   } else {
     document.getElementById("settembre-porch-display-container").innerHTML = `<span class="meter-value">${escapeHtml(state.settembreCalendar.porchAssignee) || 'Non assegnato'}</span>`;
+  }
+
+  // RENDER HOUSE CLEANING (PULIZIA CASA)
+  const settembreHouseCleaningList = document.getElementById("settembre-house-cleaning-list");
+  if (settembreHouseCleaningList) {
+    settembreHouseCleaningList.innerHTML = "";
+    const sortedSettembreHouseParts = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
+    sortedSettembreHouseParts.forEach(zone => {
+      const data = state.settembreCalendar.houseCleaning[zone.id] || { assigned: [], helpers: [] };
+      const assignedNames = Array.isArray(data.assigned) ? data.assigned : (data.assigned ? [data.assigned] : []);
+      const card = document.createElement("div");
+      card.className = "house-part-card";
+
+      let assigneeHTML = "";
+      if (state.isSettembreUnlocked) {
+        assigneeHTML = `<input type="text" id="edit-settembre-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">
+          ${settembreAssigneePickerHTML(`edit-settembre-house-${zone.id}`)}`;
+      } else {
+        assigneeHTML = `<span class="house-part-assignee">${escapeHtml(assignedNames.join(', ')) || 'Non assegnato'}</span>`;
+      }
+
+      let helpersHTML = "";
+      if (data.helpers && data.helpers.length > 0) {
+        data.helpers.forEach(h => {
+          helpersHTML += `<div class="house-part-helper">Aiuto: ${escapeHtml(h.name)} (${h.days.join(', ')})</div>`;
+        });
+      }
+
+      card.innerHTML = `
+        <div class="house-part-name">${escapeHtml(zone.name)}</div>
+        <div class="house-part-assignee-container" style="margin-top: 4px;">
+          ${assigneeHTML}
+        </div>
+        ${helpersHTML}
+      `;
+      settembreHouseCleaningList.appendChild(card);
+    });
   }
 
   // RENDER WEEKLY TASKS
@@ -2463,6 +2618,43 @@ function generateSettembreCalendar() {
   if (porchCandidate) {
     newCalendar.porchAssignee = porchCandidate.name;
     loadCounts[porchCandidate.id] += 2;
+  }
+
+  // ZONE DI PULIZIA - same approach as the original scheda's house cleaning
+  // zones: open to the whole combined roster (no aspiranti/supervisori
+  // target), primaries drawn only from people present all week, partially
+  // present people distributed as helpers.
+  const settembreZones = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
+  const settembreZonePrimaryPool = fullyPresentCandidates.length > 0 ? fullyPresentCandidates : activeCandidates;
+
+  settembreZones.forEach(zone => {
+    const assignedCandidates = [];
+    const minP = (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1;
+
+    for (let i = 0; i < minP; i++) {
+      const candidates = settembreZonePrimaryPool.filter(c => !assignedCandidates.includes(c));
+      if (candidates.length === 0) break;
+
+      candidates.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
+      const selected = candidates[0];
+      assignedCandidates.push(selected);
+      loadCounts[selected.id] += 3;
+    }
+
+    newCalendar.houseCleaning[zone.id] = {
+      assigned: assignedCandidates.map(c => c.name),
+      helpers: []
+    };
+  });
+
+  if (settembreZones.length > 0) {
+    partiallyAbsentCandidates.forEach((item, idx) => {
+      const targetZone = settembreZones[idx % settembreZones.length];
+      newCalendar.houseCleaning[targetZone.id].helpers.push({
+        name: item.person.name,
+        days: item.presentDays.map(d => d.slice(0, 3))
+      });
+    });
   }
 
   state.settembreCalendar = newCalendar;

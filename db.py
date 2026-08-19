@@ -66,12 +66,15 @@ DEFAULT_SETTEMBRE_ASPIRANTI = (
 
 DEFAULT_SETTEMBRE_TASKS = []
 
+DEFAULT_SETTEMBRE_HOUSE_PARTS = []
+
 DEFAULTS = {
     "people": DEFAULT_PEOPLE,
     "tasks": DEFAULT_TASKS,
     "houseParts": DEFAULT_HOUSE_PARTS,
     "settembreAspiranti": DEFAULT_SETTEMBRE_ASPIRANTI,
     "settembreTasks": DEFAULT_SETTEMBRE_TASKS,
+    "settembreHouseParts": DEFAULT_SETTEMBRE_HOUSE_PARTS,
 }
 
 VALID_KEYS = {
@@ -81,6 +84,7 @@ VALID_KEYS = {
     "calendar",
     "settembreAspiranti",
     "settembreTasks",
+    "settembreHouseParts",
     "settembreCalendar",
 }
 
@@ -141,6 +145,7 @@ def get_all_state():
         "calendar": data.get("calendar"),
         "settembreAspiranti": data.get("settembreAspiranti", []),
         "settembreTasks": data.get("settembreTasks", []),
+        "settembreHouseParts": data.get("settembreHouseParts", []),
         "settembreCalendar": data.get("settembreCalendar"),
     }
 

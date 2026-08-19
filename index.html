@@ -404,17 +404,20 @@
       <section id="tab-attivita-settembre" class="tab-content">
         <div class="page-header">
           <h2 class="page-title">Attività Settembre</h2>
-          <div class="header-actions">
-            <button id="add-settembre-task-btn" class="add-btn">
-              <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
-                <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
-              </svg>
-              Aggiungi Mansione
-            </button>
-          </div>
         </div>
 
         <div class="card">
+          <div class="page-header" style="margin-bottom: 16px;">
+            <h3 class="card-title" style="margin-bottom: 0;">Mansioni Settimanali</h3>
+            <div class="header-actions">
+              <button id="add-settembre-task-btn" class="add-btn">
+                <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                  <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                </svg>
+                Aggiungi Mansione
+              </button>
+            </div>
+          </div>
           <div class="table-responsive">
             <table class="data-table">
               <thead>
@@ -427,6 +430,35 @@
                 </tr>
               </thead>
               <tbody id="settembre-tasks-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 16px;">
+            <h3 class="card-title" style="margin-bottom: 0;">Zone di Pulizia</h3>
+            <div class="header-actions">
+              <button id="add-settembre-house-part-btn" class="add-btn">
+                <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                  <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                </svg>
+                Aggiungi Zona
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome Zona</th>
+                  <th>Min Persone</th>
+                  <th>Priorità</th>
+                  <th style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-house-parts-table-body">
                 <!-- Dynamically populated -->
               </tbody>
             </table>
@@ -537,6 +569,14 @@
                 <span id="settembre-porch-assignee-text" class="meter-value">-</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- HOUSE CLEANING (PULIZIA CASA) -->
+        <div class="card">
+          <h3 class="card-title">Pulizia Casa</h3>
+          <div id="settembre-house-cleaning-list" class="house-cleaning-grid">
+            <!-- Dynamically populated -->
           </div>
         </div>
 
@@ -859,6 +899,33 @@
       <div class="modal-actions">
         <button id="close-modal-settembre-task-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
         <button id="save-settembre-task-btn" class="btn btn-primary" style="width: auto;">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT SETTEMBRE HOUSE CLEANING ZONE -->
+  <div id="modal-settembre-house-part" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="modal-settembre-house-part-header" class="modal-header">Aggiungi Zona di Pulizia</h3>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-house-part-name">Nome Zona</label>
+        <input type="text" id="settembre-house-part-name" class="input-field" placeholder="Es. Cucina" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-house-part-min-people">Numero Minimo Persone</label>
+        <input type="number" id="settembre-house-part-min-people" class="input-field" value="1" min="1" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-house-part-priority">Priorità (1 = Max, 999 = Min)</label>
+        <input type="text" id="settembre-house-part-priority" class="input-field" placeholder="Es. 1 (o inserisci testo per 999)">
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-modal-settembre-house-part-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
+        <button id="save-settembre-house-part-btn" class="btn btn-primary" style="width: auto;">Salva</button>
       </div>
     </div>
   </div>

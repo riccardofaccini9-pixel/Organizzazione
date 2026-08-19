@@ -400,6 +400,40 @@
         </div>
       </section>
 
+      <!-- TAB: GESTIONE MANSIONI SETTEMBRE (visible only from within the Settembre context) -->
+      <section id="tab-attivita-settembre" class="tab-content">
+        <div class="page-header">
+          <h2 class="page-title">Attività Settembre</h2>
+          <div class="header-actions">
+            <button id="add-settembre-task-btn" class="add-btn">
+              <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+              </svg>
+              Aggiungi Mansione
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome Attività</th>
+                  <th>Min Persone</th>
+                  <th>Priorità</th>
+                  <th>Assegnata a</th>
+                  <th style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-tasks-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- TAB: SETTEMBRE -->
       <section id="tab-settembre" class="tab-content">
         <div class="page-header">
@@ -468,37 +502,6 @@
               <div class="day-header">domenica</div>
               <div class="day-tasks-list"></div>
             </div>
-          </div>
-        </div>
-
-        <!-- ADMIN: GESTIONE MANSIONI SETTEMBRE -->
-        <div class="card admin-only">
-          <div class="page-header" style="margin-bottom: 16px;">
-            <h3 class="card-title" style="margin-bottom: 0;">Gestione Mansioni Settembre</h3>
-            <div class="header-actions">
-              <button id="add-settembre-task-btn" class="add-btn">
-                <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
-                  <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
-                </svg>
-                Aggiungi Mansione
-              </button>
-            </div>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Nome Attività</th>
-                  <th>Min Persone</th>
-                  <th>Priorità</th>
-                  <th>Assegnata a</th>
-                  <th style="width: 80px; text-align: center;">Azioni</th>
-                </tr>
-              </thead>
-              <tbody id="settembre-tasks-table-body">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
           </div>
         </div>
 
@@ -650,7 +653,7 @@
                 <span>Settembre</span>
               </button>
             </li>
-            <li class="nav-item admin-only" data-tab="tab-generazione">
+            <li class="nav-item admin-only main-only" data-tab="tab-generazione">
               <button>
                 <svg viewBox="0 0 24 24">
                   <path d="M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,14.21 4.9,16.21 6.34,17.65L7.75,16.24C6.67,15.16 6,13.66 6,12A6,6 0 0,1 12,6M17.66,6.34L16.25,7.75C17.33,8.83 18,10.34 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,9.79 19.1,7.79 17.66,6.34Z" />
@@ -658,7 +661,7 @@
                 <span>Genera Turni</span>
               </button>
             </li>
-            <li class="nav-item admin-only" data-tab="tab-mansioni">
+            <li class="nav-item admin-only main-only" data-tab="tab-mansioni">
               <button>
                 <svg viewBox="0 0 24 24">
                   <path d="M14,10H19.5L14,4.5V10M5,3H15L21,9V21A2,2 0 0,1 19,23H5C3.89,23 3,22.1 3,21V5C3,3.89 3.89,3 5,3M5,5V21H19V12H12V5H5M7,9H10V11H7V9M7,13H17V15H7V13M7,17H17V19H7V17Z" />
@@ -666,7 +669,7 @@
                 <span>Mansioni</span>
               </button>
             </li>
-            <li class="nav-item admin-only" data-tab="tab-persone">
+            <li class="nav-item admin-only main-only" data-tab="tab-persone">
               <button>
                 <svg viewBox="0 0 24 24">
                   <path d="M16,13C15.71,13 15.38,13 15.03,13.05C16.19,13.89 17,15 17,16.5V19H23V16.5C23,14.17 18.33,13 16,13M8,13C5.67,13 1,14.17 1,16.5V19H15V16.5C15,14.17 10.33,13 8,13M8,11A3,3 0 0,0 11,8A3,3 0 0,0 8,5A3,3 0 0,0 5,8A3,3 0 0,0 8,11M16,11A3,3 0 0,0 19,8A3,3 0 0,0 16,5A3,3 0 0,0 13,8A3,3 0 0,0 16,11Z" />
@@ -674,12 +677,20 @@
                 <span>Persone</span>
               </button>
             </li>
-            <li class="nav-item admin-only" data-tab="tab-aspiranti">
+            <li class="nav-item admin-only settembre-only" data-tab="tab-aspiranti">
               <button>
                 <svg viewBox="0 0 24 24">
                   <path d="M12,20A6,6 0 0,1 6,14C6,10 12,3.25 12,3.25C12,3.25 18,10 18,14A6,6 0 0,1 12,20Z" />
                 </svg>
                 <span>Aspiranti</span>
+              </button>
+            </li>
+            <li class="nav-item admin-only settembre-only" data-tab="tab-attivita-settembre">
+              <button>
+                <svg viewBox="0 0 24 24">
+                  <path d="M14,10H19.5L14,4.5V10M5,3H15L21,9V21A2,2 0 0,1 19,23H5C3.89,23 3,22.1 3,21V5C3,3.89 3.89,3 5,3M5,5V21H19V12H12V5H5M7,9H10V11H7V9M7,13H17V15H7V13M7,17H17V19H7V17Z" />
+                </svg>
+                <span>Attività</span>
               </button>
             </li>
           </ul>

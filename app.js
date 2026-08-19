@@ -468,6 +468,8 @@ function switchTab(tabId) {
   if (tabId === "tab-settembre") {
     resetSettembreWizard();
   }
+
+  updateNavContextVisibility();
 }
 
 // MODALS AND FORMS
@@ -915,6 +917,37 @@ function refreshCurrentUserUI() {
   } else {
     document.querySelectorAll(".aspirante-hide").forEach(el => el.style.display = "");
   }
+
+  updateNavContextVisibility();
+}
+
+// SETTEMBRE has its own "area" of the sidebar: entering it (tab-settembre,
+// tab-aspiranti, tab-attivita-settembre) hides the original scheda's
+// admin-only nav items (Genera Turni/Mansioni/Persone, tagged "main-only")
+// and reveals its own (Aspiranti/Attività, tagged "settembre-only") -
+// mirroring how the original scheda's admin tabs work, but scoped to
+// whichever context is currently active.
+const SETTEMBRE_CONTEXT_TABS = ["tab-settembre", "tab-aspiranti", "tab-attivita-settembre"];
+
+function isInSettembreContext() {
+  const activeSection = document.querySelector(".tab-content.active");
+  const activeId = activeSection ? activeSection.id : "tab-visualizzazione";
+  return SETTEMBRE_CONTEXT_TABS.includes(activeId);
+}
+
+function updateNavContextVisibility() {
+  const inSettembre = isInSettembreContext();
+  const isAdmin = state.currentUser.role === "admin";
+
+  // Re-derive visibility from scratch (role + context) rather than only
+  // hiding, so switching back out of Settembre correctly restores the
+  // main-only items an admin should see again.
+  document.querySelectorAll(".nav-item.settembre-only").forEach(el => {
+    el.style.display = (inSettembre && (!el.classList.contains("admin-only") || isAdmin)) ? "" : "none";
+  });
+  document.querySelectorAll(".nav-item.main-only").forEach(el => {
+    el.style.display = (!inSettembre && (!el.classList.contains("admin-only") || isAdmin)) ? "" : "none";
+  });
 }
 
 function deletePerson(id) {

@@ -1418,6 +1418,7 @@ function createBlankSettembreCalendar() {
     houseCleaning: {},
     esterniCleaning: {},
     weekly: {},
+    eveningCheck: {},
     exceptions: []
   };
 
@@ -1431,6 +1432,7 @@ function createBlankSettembreCalendar() {
 
   WIZARD_DAYS.forEach(day => {
     cal.weekly[day] = [];
+    cal.eveningCheck[day] = { supervisore: "", aspirante: "" };
   });
 
   return cal;
@@ -1806,6 +1808,16 @@ function saveEditedSettembreCalendarState() {
         }
       });
     }
+
+    const eveningSupervisoreSelect = document.getElementById(`edit-settembre-evening-supervisore-${day}`);
+    const eveningAspiranteSelect = document.getElementById(`edit-settembre-evening-aspirante-${day}`);
+    if (eveningSupervisoreSelect || eveningAspiranteSelect) {
+      if (!state.settembreCalendar.eveningCheck[day]) {
+        state.settembreCalendar.eveningCheck[day] = { supervisore: "", aspirante: "" };
+      }
+      if (eveningSupervisoreSelect) state.settembreCalendar.eveningCheck[day].supervisore = eveningSupervisoreSelect.value;
+      if (eveningAspiranteSelect) state.settembreCalendar.eveningCheck[day].aspirante = eveningAspiranteSelect.value;
+    }
   });
 
   persistState("settembreCalendar", state.settembreCalendar);
@@ -1987,6 +1999,43 @@ function renderSettembreCalendar() {
       list.innerHTML = `<div style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">Nessuna attività generata</div>`;
     }
   });
+
+  // RENDER EVENING CHECK (CONTROLLO SERALE) - one supervisore + one
+  // aspirante per day.
+  const settembreEveningCheckList = document.getElementById("settembre-evening-check-list");
+  if (settembreEveningCheckList) {
+    settembreEveningCheckList.innerHTML = "";
+    WIZARD_DAYS.forEach(day => {
+      const entry = state.settembreCalendar.eveningCheck[day] || { supervisore: "", aspirante: "" };
+      const pill = document.createElement("div");
+      pill.className = "evening-day-pill";
+
+      let assigneeHTML = "";
+      if (state.isSettembreUnlocked) {
+        assigneeHTML = `
+          <select id="edit-settembre-evening-supervisore-${day}" class="input-field" style="padding: 6px 10px; font-size: 13px; margin-top: 4px;">
+            <option value="">Nessuno</option>
+            ${supervisoriRoster.map(c => `<option value="${escapeHtml(c.name)}" ${entry.supervisore === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+          <select id="edit-settembre-evening-aspirante-${day}" class="input-field" style="padding: 6px 10px; font-size: 13px; margin-top: 4px;">
+            <option value="">Nessuno</option>
+            ${aspirantiRoster.map(c => `<option value="${escapeHtml(c.name)}" ${entry.aspirante === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+        `;
+      } else {
+        assigneeHTML = `
+          <div class="evening-day-assignee">${escapeHtml(entry.supervisore) || '-'}</div>
+          <div class="evening-day-assignee">${escapeHtml(entry.aspirante) || '-'}</div>
+        `;
+      }
+
+      pill.innerHTML = `
+        <div class="evening-day-name">${day}</div>
+        ${assigneeHTML}
+      `;
+      settembreEveningCheckList.appendChild(pill);
+    });
+  }
 }
 
 // "COSA FACCIO OGGI?" SEARCH
@@ -2935,6 +2984,48 @@ function generateSettembreCalendar() {
 
   assignSettembreZones(state.settembreHouseParts, newCalendar.houseCleaning);
   assignSettembreZones(state.settembreEsterniParts, newCalendar.esterniCleaning);
+
+  // CONTROLLO SERALE - one supervisore + one aspirante per day, each
+  // tracked (and gap-limited) independently within its own pool so the
+  // same person doesn't do it on two consecutive days.
+  const MIN_EVENING_GAP = 2;
+  const eveningLastDay = {};
+  const eveningLoad = {};
+  activeCandidates.forEach(c => { eveningLastDay[c.id] = -Infinity; eveningLoad[c.id] = 0; });
+
+  function pickEveningPerson(pool, dayIndex) {
+    if (pool.length === 0) return null;
+    let candidates = pool.filter(c => (dayIndex - eveningLastDay[c.id]) >= MIN_EVENING_GAP);
+    if (candidates.length === 0) {
+      const sorted = [...pool].sort((a, b) => eveningLastDay[a.id] - eveningLastDay[b.id]);
+      candidates = [sorted[0]];
+    }
+    candidates.sort((a, b) => eveningLoad[a.id] - eveningLoad[b.id]);
+    return candidates[0];
+  }
+
+  WIZARD_DAYS.forEach((day, dayIndex) => {
+    const dailyRosterAll = getPresentCandidatesForDay(day);
+    const supervisoriToday = dailyRosterAll.filter(c => c.kind === "supervisore");
+    const aspirantiToday = dailyRosterAll.filter(c => c.kind === "aspirante");
+
+    const selectedSupervisore = pickEveningPerson(supervisoriToday, dayIndex);
+    const selectedAspirante = pickEveningPerson(aspirantiToday, dayIndex);
+
+    if (selectedSupervisore) {
+      eveningLastDay[selectedSupervisore.id] = dayIndex;
+      eveningLoad[selectedSupervisore.id]++;
+    }
+    if (selectedAspirante) {
+      eveningLastDay[selectedAspirante.id] = dayIndex;
+      eveningLoad[selectedAspirante.id]++;
+    }
+
+    newCalendar.eveningCheck[day] = {
+      supervisore: selectedSupervisore ? selectedSupervisore.name : "",
+      aspirante: selectedAspirante ? selectedAspirante.name : ""
+    };
+  });
 
   state.settembreCalendar = newCalendar;
   persistState("settembreCalendar", newCalendar);

@@ -29,19 +29,22 @@ const WIZARD_DAYS = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì"
 // SETTEMBRE: fixed weekly shower-shift grid (never changes - only the names
 // behind each slot, in state.settembreAspiranti, are editable). Uses the
 // same Lun->Dom order as WIZARD_DAYS.
-const SHOWER_TIMES = { mattina: "7:15 - 7:30", pomeriggio: "13:40 - 13:55", sera: "18:35 - 18:50" };
+const SHOWER_TIMES = { mattina: "7:05 - 7:30", pomeriggio: "13:30 - 13:55", sera: "18:35 - 19:00" };
+// 4 uomini (U) + 1 donna (F) per turno, riempiti progressivamente da U1/F1
+// in avanti (con "giro" quando si supera U13/F3) seguendo l'ordine
+// mattina->pomeriggio->sera, lunedì->domenica.
 const SHOWER_SCHEDULE = {
   mattina: {
-    lunedì: ["u1", "u2", "f1"], martedì: ["u7", "u8"], mercoledì: ["u13", "u1", "f1"],
-    giovedì: ["u6", "u7"], venerdì: ["u12", "u13", "f1"], sabato: ["u5", "u6"], domenica: ["u11", "f1"]
+    lunedì: ["u1", "u2", "u3", "u4", "f1"], martedì: ["u5", "u6", "u7", "u8", "f2"], mercoledì: ["u9", "u10", "u11", "u12", "f3"],
+    giovedì: ["u13", "u1", "u2", "u3", "f1"], venerdì: ["u4", "u5", "u6", "u7", "f2"], sabato: ["u8", "u9", "u10", "u11", "f3"], domenica: ["u12", "u13", "u1", "u2", "f1"]
   },
   pomeriggio: {
-    lunedì: ["u3", "u4", "f2"], martedì: ["u9", "u10"], mercoledì: ["u2", "u3", "f2"],
-    giovedì: ["u8", "u9"], venerdì: ["u1", "u2", "f2"], sabato: ["u7", "u8"], domenica: ["u12", "f2"]
+    lunedì: ["u3", "u4", "u5", "u6", "f2"], martedì: ["u7", "u8", "u9", "u10", "f3"], mercoledì: ["u11", "u12", "u13", "u1", "f1"],
+    giovedì: ["u2", "u3", "u4", "u5", "f2"], venerdì: ["u6", "u7", "u8", "u9", "f3"], sabato: ["u10", "u11", "u12", "u13", "f1"], domenica: ["u1", "u2", "u3", "u4", "f2"]
   },
   sera: {
-    lunedì: ["u5", "u6", "f3"], martedì: ["u11", "u12"], mercoledì: ["u4", "u5"],
-    giovedì: ["u10", "u11"], venerdì: ["u3", "u4", "f3"], sabato: ["u9", "u10"], domenica: ["u13", "f3"]
+    lunedì: ["u5", "u6", "u7", "u8", "f3"], martedì: ["u9", "u10", "u11", "u12", "f1"], mercoledì: ["u13", "u1", "u2", "u3", "f2"],
+    giovedì: ["u4", "u5", "u6", "u7", "f3"], venerdì: ["u8", "u9", "u10", "u11", "f1"], sabato: ["u12", "u13", "u1", "u2", "f2"], domenica: ["u3", "u4", "u5", "u6", "f3"]
   }
 };
 
@@ -1268,6 +1271,14 @@ function createBlankSettembreCalendar() {
 // changes) - resolves each slot id from SHOWER_SCHEDULE into the name
 // currently behind that slot in state.settembreAspiranti.
 function renderShowerTable() {
+  ["mattina", "pomeriggio", "sera"].forEach(shift => {
+    const labelCell = document.querySelector(`#shower-table-body tr[data-shift="${shift}"] .laundry-shift-label`);
+    if (labelCell) {
+      const label = shift.charAt(0).toUpperCase() + shift.slice(1);
+      labelCell.innerHTML = `${label}<br><small>${escapeHtml(SHOWER_TIMES[shift])}</small>`;
+    }
+  });
+
   WIZARD_DAYS.forEach(day => {
     ["mattina", "pomeriggio", "sera"].forEach(shift => {
       const slotIds = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];

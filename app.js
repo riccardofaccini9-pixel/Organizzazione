@@ -9,6 +9,7 @@ let state = {
   settembreAspiranti: [],
   settembreTasks: [],
   settembreHouseParts: [],
+  settembreEsterniParts: [],
   settembreCalendar: null,
   isSettembreUnlocked: false
 };
@@ -19,6 +20,7 @@ let editingPersonId = null;
 let editingHousePartId = null;
 let editingSettembreTaskId = null;
 let editingSettembreHousePartId = null;
+let editingSettembreEsterniPartId = null;
 
 // Default seed data (used when no data exists yet) now lives server-side in
 // db.py, so the server always returns real data - no client-side seeding.
@@ -50,19 +52,22 @@ const SHOWER_SCHEDULE = {
 
 // SETTEMBRE: internal-only time windows (never shown anywhere in the UI,
 // unlike SHOWER_TIMES) used purely so the generator doesn't assign someone
-// to a meal/kitchen duty while they're scheduled for a shower. Matched by
-// exact task name (case-insensitive) - if no task with that name exists,
-// this simply never triggers.
+// to a kitchen duty while they're scheduled for a shower. Matched by exact
+// task name (case-insensitive) - if no task with that name exists, this
+// simply never triggers. "Cucina"/"Aiuto Cucina" cook both lunch and
+// dinner, so each carries both meal windows - a conflict with either counts.
+const MEAL_PREP_TIME_WINDOWS = [
+  { start: "11:45", end: "12:50" }, // cucina pranzo
+  { start: "18:30", end: "19:20" }  // cucina cena
+];
 const SETTEMBRE_TASK_TIME_WINDOWS = {
-  "cucina pranzo": { start: "11:45", end: "12:50" },
-  "pranzo": { start: "12:50", end: "14:00" },
-  "cucina cena": { start: "18:30", end: "19:20" },
-  "cena": { start: "19:20", end: "20:00" }
+  "cucina": MEAL_PREP_TIME_WINDOWS,
+  "aiuto cucina": MEAL_PREP_TIME_WINDOWS
 };
-// Zone di Pulizia ("Pulizia Casa") isn't a per-day task - its primary
-// assignee cleans every day of the week - so this is checked against every
-// day's shower schedule rather than a single day.
-const PULIZIA_CASA_TIME_WINDOW = { start: "8:30", end: "9:00" };
+// Zone di Pulizia ("Pulizia Casa"/"Pulizia Esterni") aren't per-day tasks -
+// their primary assignees clean every day of the week - so this is checked
+// against every day's shower schedule rather than a single day.
+const ZONE_CLEANING_TIME_WINDOW = { start: "8:30", end: "9:00" };
 
 function parseTimeToMinutes(t) {
   const [h, m] = t.trim().split(":").map(Number);
@@ -91,8 +96,20 @@ function isCandidateShoweringDuring(candidateId, day, windowStart, windowEnd) {
   return getShowerRangesForCandidateOnDay(candidateId, day).some(r => timeRangesOverlap(r.start, r.end, windowStart, windowEnd));
 }
 
+// windows can be a single {start,end} or an array of them (e.g. lunch+dinner) -
+// a conflict with any one of them counts.
+function isCandidateShoweringDuringAny(candidateId, day, windows) {
+  const list = Array.isArray(windows) ? windows : [windows];
+  return list.some(w => isCandidateShoweringDuring(candidateId, day, w.start, w.end));
+}
+
 function hasAnyShowerOverlapWithWindow(candidateId, windowStart, windowEnd) {
   return WIZARD_DAYS.some(day => isCandidateShoweringDuring(candidateId, day, windowStart, windowEnd));
+}
+
+function hasAnyShowerOverlapWithAnyWindow(candidateId, windows) {
+  const list = Array.isArray(windows) ? windows : [windows];
+  return WIZARD_DAYS.some(day => isCandidateShoweringDuringAny(candidateId, day, list));
 }
 
 // WIZARD STATE
@@ -254,6 +271,7 @@ function refreshLiveUI() {
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();
+  populateSettembreEsterniPartsTable();
   if (!state.calendar) {
     state.calendar = createBlankCalendar();
   }
@@ -292,6 +310,12 @@ function applyServerState(data) {
   state.settembreAspiranti = data.settembreAspiranti || [];
   state.settembreTasks = data.settembreTasks || [];
   state.settembreHouseParts = (data.settembreHouseParts || []).map(zone => ({
+    id: zone.id,
+    name: zone.name,
+    minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
+    priority: (typeof zone.priority === "number") ? zone.priority : 999
+  }));
+  state.settembreEsterniParts = (data.settembreEsterniParts || []).map(zone => ({
     id: zone.id,
     name: zone.name,
     minPeople: (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1,
@@ -401,6 +425,11 @@ function init() {
   document.getElementById("close-modal-settembre-house-part-btn").addEventListener("click", () => closeModal(document.getElementById("modal-settembre-house-part")));
   document.getElementById("save-settembre-house-part-btn").addEventListener("click", saveSettembreHousePart);
 
+  // SETTEMBRE: Pulizia Esterni Modal Buttons
+  document.getElementById("add-settembre-esterni-part-btn").addEventListener("click", () => openAddSettembreEsterniPartModal());
+  document.getElementById("close-modal-settembre-esterni-part-btn").addEventListener("click", () => closeModal(document.getElementById("modal-settembre-esterni-part")));
+  document.getElementById("save-settembre-esterni-part-btn").addEventListener("click", saveSettembreEsterniPart);
+
   // SETTEMBRE: Wizard Buttons
   document.getElementById("start-wizard-btn-settembre").addEventListener("click", startSettembreWizard);
   document.getElementById("confirm-absent-btn-settembre").addEventListener("click", goToStep2Settembre);
@@ -489,6 +518,7 @@ function showApp() {
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();
+  populateSettembreEsterniPartsTable();
 
   if (state.calendar) {
     renderCalendar();
@@ -963,6 +993,93 @@ function populateSettembreHousePartsTable() {
   });
 }
 
+// PULIZIA ESTERNI - separate zone list mirroring Zone di Pulizia exactly
+// (same fields, same aspiranti-only + shower-overlap restriction).
+function openAddSettembreEsterniPartModal() {
+  editingSettembreEsterniPartId = null;
+  document.getElementById("modal-settembre-esterni-part-header").textContent = "Aggiungi Zona Pulizia Esterni";
+  document.getElementById("settembre-esterni-part-name").value = "";
+  document.getElementById("settembre-esterni-part-min-people").value = "1";
+  document.getElementById("settembre-esterni-part-priority").value = "";
+  openModal(document.getElementById("modal-settembre-esterni-part"));
+}
+
+function editSettembreEsterniPart(id) {
+  const zone = state.settembreEsterniParts.find(z => z.id === id);
+  if (!zone) return;
+
+  editingSettembreEsterniPartId = id;
+  document.getElementById("modal-settembre-esterni-part-header").textContent = "Modifica Zona Pulizia Esterni";
+  document.getElementById("settembre-esterni-part-name").value = zone.name;
+  document.getElementById("settembre-esterni-part-min-people").value = zone.minPeople;
+  document.getElementById("settembre-esterni-part-priority").value = zone.priority;
+  openModal(document.getElementById("modal-settembre-esterni-part"));
+}
+
+function saveSettembreEsterniPart() {
+  const name = document.getElementById("settembre-esterni-part-name").value.trim();
+  const minPeople = parseInt(document.getElementById("settembre-esterni-part-min-people").value) || 1;
+  const rawPriority = document.getElementById("settembre-esterni-part-priority").value.trim();
+
+  if (!name) {
+    alert("Inserire il nome della zona!");
+    return;
+  }
+
+  let priority = 999;
+  if (rawPriority !== "" && !isNaN(rawPriority)) {
+    priority = parseInt(rawPriority);
+  }
+
+  if (editingSettembreEsterniPartId) {
+    const zone = state.settembreEsterniParts.find(z => z.id === editingSettembreEsterniPartId);
+    zone.name = name;
+    zone.minPeople = minPeople;
+    zone.priority = priority;
+  } else {
+    state.settembreEsterniParts.push({ id: "settembre-esterni-" + Date.now(), name, minPeople, priority });
+  }
+
+  persistState("settembreEsterniParts", state.settembreEsterniParts);
+  editingSettembreEsterniPartId = null;
+
+  closeModal(document.getElementById("modal-settembre-esterni-part"));
+  populateSettembreEsterniPartsTable();
+  renderSettembreCalendar();
+}
+
+function deleteSettembreEsterniPart(id) {
+  state.settembreEsterniParts = state.settembreEsterniParts.filter(z => z.id !== id);
+  persistState("settembreEsterniParts", state.settembreEsterniParts);
+  populateSettembreEsterniPartsTable();
+  renderSettembreCalendar();
+}
+
+function populateSettembreEsterniPartsTable() {
+  const tbody = document.getElementById("settembre-esterni-parts-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const sorted = [...state.settembreEsterniParts].sort((a, b) => a.priority - b.priority);
+
+  sorted.forEach(zone => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(zone.name)}</strong></td>
+      <td>${zone.minPeople}</td>
+      <td>${zone.priority}</td>
+      <td style="text-align: center;">
+        <button class="action-btn-edit" onclick="editSettembreEsterniPart('${zone.id}')">
+          <svg viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>
+        </button>
+        <button class="action-btn-danger" onclick="deleteSettembreEsterniPart('${zone.id}')">
+          <svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function openAddPersonModal() {
   editingPersonId = null;
   personModalHeader.textContent = "Aggiungi Nuovo Utente (Cadetto)";
@@ -1299,12 +1416,17 @@ function createBlankSettembreCalendar() {
     meterAssignee: "",
     porchAssignee: "",
     houseCleaning: {},
+    esterniCleaning: {},
     weekly: {},
     exceptions: []
   };
 
   state.settembreHouseParts.forEach(zone => {
     cal.houseCleaning[zone.id] = { assigned: [], helpers: [] };
+  });
+
+  state.settembreEsterniParts.forEach(zone => {
+    cal.esterniCleaning[zone.id] = { assigned: [], helpers: [] };
   });
 
   WIZARD_DAYS.forEach(day => {
@@ -1665,6 +1787,16 @@ function saveEditedSettembreCalendarState() {
     }
   });
 
+  state.settembreEsterniParts.forEach(zone => {
+    const input = document.getElementById(`edit-settembre-esterni-${zone.id}`);
+    if (input) {
+      if (!state.settembreCalendar.esterniCleaning[zone.id]) {
+        state.settembreCalendar.esterniCleaning[zone.id] = { assigned: [], helpers: [] };
+      }
+      state.settembreCalendar.esterniCleaning[zone.id].assigned = input.value.split(",").map(s => s.trim()).filter(Boolean);
+    }
+  });
+
   WIZARD_DAYS.forEach(day => {
     if (state.settembreCalendar.weekly[day]) {
       state.settembreCalendar.weekly[day].forEach((taskInst, idx) => {
@@ -1677,6 +1809,58 @@ function saveEditedSettembreCalendarState() {
   });
 
   persistState("settembreCalendar", state.settembreCalendar);
+
+  const conflicts = checkSettembreShowerConflicts();
+  if (conflicts.length > 0) {
+    alert("Attenzione: alcune assegnazioni sono incompatibili con gli orari doccia:\n\n" + conflicts.join("\n"));
+  }
+}
+
+// Manual edits (unlike the generator, which already avoids this) can freely
+// assign anyone to anything, so on save we check every assignee against the
+// same shower-overlap rules the generator enforces and warn (without
+// blocking the save) if something doesn't fit.
+function checkSettembreShowerConflicts() {
+  const conflicts = [];
+
+  function nameToAspiranteId(name) {
+    const a = state.settembreAspiranti.find(x => x.name === name);
+    return a ? a.id : null;
+  }
+
+  WIZARD_DAYS.forEach(day => {
+    (state.settembreCalendar.weekly[day] || []).forEach(taskInst => {
+      const windows = SETTEMBRE_TASK_TIME_WINDOWS[taskInst.name.trim().toLowerCase()];
+      if (!windows) return;
+      taskInst.assigned.forEach(name => {
+        const id = nameToAspiranteId(name);
+        if (!id) return;
+        if (isCandidateShoweringDuringAny(id, day, windows)) {
+          conflicts.push(`${name} - "${taskInst.name}" (${day}): ha la doccia in quell'orario`);
+        }
+      });
+    });
+  });
+
+  [
+    { list: state.settembreHouseParts, cleaning: state.settembreCalendar.houseCleaning },
+    { list: state.settembreEsterniParts, cleaning: state.settembreCalendar.esterniCleaning }
+  ].forEach(({ list, cleaning }) => {
+    list.forEach(zone => {
+      const data = cleaning[zone.id];
+      if (!data) return;
+      (data.assigned || []).forEach(name => {
+        const id = nameToAspiranteId(name);
+        if (!id) return;
+        const conflictDay = WIZARD_DAYS.find(day => isCandidateShoweringDuring(id, day, ZONE_CLEANING_TIME_WINDOW.start, ZONE_CLEANING_TIME_WINDOW.end));
+        if (conflictDay) {
+          conflicts.push(`${name} - "${zone.name}" (${conflictDay}): ha la doccia in quell'orario`);
+        }
+      });
+    });
+  });
+
+  return conflicts;
 }
 
 // Same free-text + picker pattern as assigneePickerHTML, but sourced from
@@ -1721,21 +1905,23 @@ function renderSettembreCalendar() {
     document.getElementById("settembre-porch-display-container").innerHTML = `<span class="meter-value">${escapeHtml(state.settembreCalendar.porchAssignee) || 'Non assegnato'}</span>`;
   }
 
-  // RENDER HOUSE CLEANING (PULIZIA CASA)
-  const settembreHouseCleaningList = document.getElementById("settembre-house-cleaning-list");
-  if (settembreHouseCleaningList) {
-    settembreHouseCleaningList.innerHTML = "";
-    const sortedSettembreHouseParts = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
-    sortedSettembreHouseParts.forEach(zone => {
-      const data = state.settembreCalendar.houseCleaning[zone.id] || { assigned: [], helpers: [] };
+  // RENDER HOUSE CLEANING (PULIZIA CASA / PULIZIA ESTERNI)
+  function renderSettembreZoneCleaningList(containerId, zoneList, cleaningMap, inputIdPrefix) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = "";
+    const sortedZones = [...zoneList].sort((a, b) => a.priority - b.priority);
+    sortedZones.forEach(zone => {
+      const data = cleaningMap[zone.id] || { assigned: [], helpers: [] };
       const assignedNames = Array.isArray(data.assigned) ? data.assigned : (data.assigned ? [data.assigned] : []);
       const card = document.createElement("div");
       card.className = "house-part-card";
+      const inputId = `${inputIdPrefix}-${zone.id}`;
 
       let assigneeHTML = "";
       if (state.isSettembreUnlocked) {
-        assigneeHTML = `<input type="text" id="edit-settembre-house-${zone.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">
-          ${settembreAssigneePickerHTML(`edit-settembre-house-${zone.id}`, aspirantiRoster)}`;
+        assigneeHTML = `<input type="text" id="${inputId}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(assignedNames.join(', '))}" placeholder="Nomi separati da virgola (min. ${zone.minPeople})">
+          ${settembreAssigneePickerHTML(inputId, aspirantiRoster)}`;
       } else {
         assigneeHTML = `<span class="house-part-assignee">${escapeHtml(assignedNames.join(', ')) || 'Non assegnato'}</span>`;
       }
@@ -1754,9 +1940,12 @@ function renderSettembreCalendar() {
         </div>
         ${helpersHTML}
       `;
-      settembreHouseCleaningList.appendChild(card);
+      container.appendChild(card);
     });
   }
+
+  renderSettembreZoneCleaningList("settembre-house-cleaning-list", state.settembreHouseParts, state.settembreCalendar.houseCleaning, "edit-settembre-house");
+  renderSettembreZoneCleaningList("settembre-esterni-cleaning-list", state.settembreEsterniParts, state.settembreCalendar.esterniCleaning, "edit-settembre-esterni");
 
   // RENDER WEEKLY TASKS
   function settembreTaskPriority(taskId) {
@@ -2560,9 +2749,9 @@ function generateSettembreCalendar() {
       const minP = task.minPeople;
       const assignedCandidates = [];
       let eligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, task.target));
-      const taskTimeWindow = SETTEMBRE_TASK_TIME_WINDOWS[task.name.trim().toLowerCase()];
-      if (taskTimeWindow) {
-        eligiblePool = eligiblePool.filter(c => !isCandidateShoweringDuring(c.id, day, taskTimeWindow.start, taskTimeWindow.end));
+      const taskTimeWindows = SETTEMBRE_TASK_TIME_WINDOWS[task.name.trim().toLowerCase()];
+      if (taskTimeWindows) {
+        eligiblePool = eligiblePool.filter(c => !isCandidateShoweringDuringAny(c.id, day, taskTimeWindows));
       }
 
       for (let i = 0; i < minP; i++) {
@@ -2700,46 +2889,52 @@ function generateSettembreCalendar() {
     loadCounts[porchCandidate.id] += 2;
   }
 
-  // ZONE DI PULIZIA - same approach as the original scheda's house cleaning
-  // zones (primaries drawn only from people present all week, partially
-  // present people distributed as helpers), but the eligible pool is
-  // aspiranti only.
-  const settembreZones = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
-  const notShoweringDuringPulizia = c => !hasAnyShowerOverlapWithWindow(c.id, PULIZIA_CASA_TIME_WINDOW.start, PULIZIA_CASA_TIME_WINDOW.end);
-  const fullyPresentAspirantiForZones = fullyPresentCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringPulizia(c));
-  const activeAspirantiForZones = activeCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringPulizia(c));
-  const settembreZonePrimaryPool = fullyPresentAspirantiForZones.length > 0 ? fullyPresentAspirantiForZones : activeAspirantiForZones;
+  // ZONE DI PULIZIA (Pulizia Casa / Pulizia Esterni) - same approach as the
+  // original scheda's house cleaning zones (primaries drawn only from
+  // people present all week, partially present people distributed as
+  // helpers), but the eligible pool is aspiranti only, and excludes anyone
+  // showering during the shared cleaning time window on any day.
+  function assignSettembreZones(zoneList, cleaningTarget) {
+    const zones = [...zoneList].sort((a, b) => a.priority - b.priority);
+    const notShoweringDuringCleaning = c => !hasAnyShowerOverlapWithWindow(c.id, ZONE_CLEANING_TIME_WINDOW.start, ZONE_CLEANING_TIME_WINDOW.end);
+    const fullyPresentAspirantiForZones = fullyPresentCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringCleaning(c));
+    const activeAspirantiForZones = activeCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringCleaning(c));
+    const zonePrimaryPool = fullyPresentAspirantiForZones.length > 0 ? fullyPresentAspirantiForZones : activeAspirantiForZones;
 
-  settembreZones.forEach(zone => {
-    const assignedCandidates = [];
-    const minP = (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1;
+    zones.forEach(zone => {
+      const assignedCandidates = [];
+      const minP = (typeof zone.minPeople === "number" && zone.minPeople > 0) ? zone.minPeople : 1;
 
-    for (let i = 0; i < minP; i++) {
-      const candidates = settembreZonePrimaryPool.filter(c => !assignedCandidates.includes(c));
-      if (candidates.length === 0) break;
+      for (let i = 0; i < minP; i++) {
+        const candidates = zonePrimaryPool.filter(c => !assignedCandidates.includes(c));
+        if (candidates.length === 0) break;
 
-      candidates.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
-      const selected = candidates[0];
-      assignedCandidates.push(selected);
-      loadCounts[selected.id] += 3;
-    }
+        candidates.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
+        const selected = candidates[0];
+        assignedCandidates.push(selected);
+        loadCounts[selected.id] += 3;
+      }
 
-    newCalendar.houseCleaning[zone.id] = {
-      assigned: assignedCandidates.map(c => c.name),
-      helpers: []
-    };
-  });
-
-  const partiallyAbsentAspirantiForZones = partiallyAbsentCandidates.filter(item => item.person.kind === "aspirante");
-  if (settembreZones.length > 0) {
-    partiallyAbsentAspirantiForZones.forEach((item, idx) => {
-      const targetZone = settembreZones[idx % settembreZones.length];
-      newCalendar.houseCleaning[targetZone.id].helpers.push({
-        name: item.person.name,
-        days: item.presentDays.map(d => d.slice(0, 3))
-      });
+      cleaningTarget[zone.id] = {
+        assigned: assignedCandidates.map(c => c.name),
+        helpers: []
+      };
     });
+
+    const partiallyAbsentAspirantiForZones = partiallyAbsentCandidates.filter(item => item.person.kind === "aspirante");
+    if (zones.length > 0) {
+      partiallyAbsentAspirantiForZones.forEach((item, idx) => {
+        const targetZone = zones[idx % zones.length];
+        cleaningTarget[targetZone.id].helpers.push({
+          name: item.person.name,
+          days: item.presentDays.map(d => d.slice(0, 3))
+        });
+      });
+    }
   }
+
+  assignSettembreZones(state.settembreHouseParts, newCalendar.houseCleaning);
+  assignSettembreZones(state.settembreEsterniParts, newCalendar.esterniCleaning);
 
   state.settembreCalendar = newCalendar;
   persistState("settembreCalendar", newCalendar);

@@ -464,6 +464,35 @@
             </table>
           </div>
         </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 16px;">
+            <h3 class="card-title" style="margin-bottom: 0;">Pulizia Esterni</h3>
+            <div class="header-actions">
+              <button id="add-settembre-esterni-part-btn" class="add-btn">
+                <svg style="width: 18px; height: 18px; fill: #fff;" viewBox="0 0 24 24">
+                  <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                </svg>
+                Aggiungi Zona
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome Zona</th>
+                  <th>Min Persone</th>
+                  <th>Priorità</th>
+                  <th style="width: 80px; text-align: center;">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-esterni-parts-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- TAB: GENERAZIONE TURNI SETTEMBRE (visible only from within the Settembre context) -->
@@ -584,6 +613,14 @@
         <div class="card">
           <h3 class="card-title">Pulizia Casa</h3>
           <div id="settembre-house-cleaning-list" class="house-cleaning-grid">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- ESTERNI CLEANING (PULIZIA ESTERNI) -->
+        <div class="card">
+          <h3 class="card-title">Pulizia Esterni</h3>
+          <div id="settembre-esterni-cleaning-list" class="house-cleaning-grid">
             <!-- Dynamically populated -->
           </div>
         </div>
@@ -934,6 +971,33 @@
       <div class="modal-actions">
         <button id="close-modal-settembre-house-part-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
         <button id="save-settembre-house-part-btn" class="btn btn-primary" style="width: auto;">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT SETTEMBRE ESTERNI ZONE -->
+  <div id="modal-settembre-esterni-part" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="modal-settembre-esterni-part-header" class="modal-header">Aggiungi Zona Pulizia Esterni</h3>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-esterni-part-name">Nome Zona</label>
+        <input type="text" id="settembre-esterni-part-name" class="input-field" placeholder="Es. Giardino" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-esterni-part-min-people">Numero Minimo Persone</label>
+        <input type="number" id="settembre-esterni-part-min-people" class="input-field" value="1" min="1" required>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label" for="settembre-esterni-part-priority">Priorità (1 = Max, 999 = Min)</label>
+        <input type="text" id="settembre-esterni-part-priority" class="input-field" placeholder="Es. 1 (o inserisci testo per 999)">
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-modal-settembre-esterni-part-btn" class="btn btn-secondary" style="width: auto;">Annulla</button>
+        <button id="save-settembre-esterni-part-btn" class="btn btn-primary" style="width: auto;">Salva</button>
       </div>
     </div>
   </div>

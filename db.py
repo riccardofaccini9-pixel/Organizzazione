@@ -68,6 +68,12 @@ DEFAULT_SETTEMBRE_TASKS = []
 
 DEFAULT_SETTEMBRE_HOUSE_PARTS = []
 
+# "Pulizia Esterni" mirrors Zone di Pulizia (Pulizia Casa) but is a
+# separate list, seeded with one zone covering the requested 4 aspiranti.
+DEFAULT_SETTEMBRE_ESTERNI_PARTS = [
+    {"id": "esterni-1", "name": "Pulizia Esterni", "minPeople": 4, "priority": 1},
+]
+
 DEFAULTS = {
     "people": DEFAULT_PEOPLE,
     "tasks": DEFAULT_TASKS,
@@ -75,6 +81,7 @@ DEFAULTS = {
     "settembreAspiranti": DEFAULT_SETTEMBRE_ASPIRANTI,
     "settembreTasks": DEFAULT_SETTEMBRE_TASKS,
     "settembreHouseParts": DEFAULT_SETTEMBRE_HOUSE_PARTS,
+    "settembreEsterniParts": DEFAULT_SETTEMBRE_ESTERNI_PARTS,
 }
 
 VALID_KEYS = {
@@ -85,6 +92,7 @@ VALID_KEYS = {
     "settembreAspiranti",
     "settembreTasks",
     "settembreHouseParts",
+    "settembreEsterniParts",
     "settembreCalendar",
 }
 
@@ -146,6 +154,7 @@ def get_all_state():
         "settembreAspiranti": data.get("settembreAspiranti", []),
         "settembreTasks": data.get("settembreTasks", []),
         "settembreHouseParts": data.get("settembreHouseParts", []),
+        "settembreEsterniParts": data.get("settembreEsterniParts", []),
         "settembreCalendar": data.get("settembreCalendar"),
     }
 

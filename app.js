@@ -278,7 +278,15 @@ function refreshLiveUI() {
   populateHousePartsTable();
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
-  populateSettembreAspirantiTable();
+  // Gestione Aspiranti has no lock/unlock like the calendars - its name
+  // inputs are always live-editable - so the same polling-clobber problem
+  // applies here too: rebuilding the table mid-edit would wipe out
+  // whatever the admin is currently typing. Skip the rebuild while focus
+  // is inside one of its inputs; it resumes on the next tick once they
+  // click away or hit Salva Nomi (which re-populates immediately anyway).
+  if (!document.activeElement || !document.activeElement.closest("#settembre-aspiranti-table-body")) {
+    populateSettembreAspirantiTable();
+  }
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();

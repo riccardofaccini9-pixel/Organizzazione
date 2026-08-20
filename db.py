@@ -69,9 +69,10 @@ DEFAULT_SETTEMBRE_TASKS = []
 DEFAULT_SETTEMBRE_HOUSE_PARTS = []
 
 # "Pulizia Esterni" mirrors Zone di Pulizia (Pulizia Casa) but is a
-# separate list, seeded with one zone covering the requested 4 aspiranti.
+# separate list, split into two 2-person zones (4 aspiranti total).
 DEFAULT_SETTEMBRE_ESTERNI_PARTS = [
-    {"id": "esterni-1", "name": "Pulizia Esterni", "minPeople": 4, "priority": 1},
+    {"id": "esterni-1", "name": "Taglio Erba", "minPeople": 2, "priority": 1},
+    {"id": "esterni-2", "name": "Pulizia Piazzale", "minPeople": 2, "priority": 2},
 ]
 
 DEFAULTS = {
@@ -134,6 +135,22 @@ def init_db():
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (json.dumps(people),),
             )
+        conn.commit()
+
+        # "Pulizia Esterni" originally shipped as a single 4-person zone
+        # before being split into "Taglio Erba" + "Pulizia Piazzale" (2 each).
+        # Replace it automatically only if it's still exactly the old
+        # untouched default - if an admin already renamed/edited/added zones,
+        # leave their data alone.
+        row = conn.execute("SELECT value FROM app_state WHERE key = 'settembreEsterniParts'").fetchone()
+        if row:
+            esterni_parts = json.loads(row["value"])
+            old_default = [{"id": "esterni-1", "name": "Pulizia Esterni", "minPeople": 4, "priority": 1}]
+            if esterni_parts == old_default:
+                conn.execute(
+                    "UPDATE app_state SET value = ? WHERE key = 'settembreEsterniParts'",
+                    (json.dumps(DEFAULT_SETTEMBRE_ESTERNI_PARTS),),
+                )
         conn.commit()
     finally:
         conn.close()

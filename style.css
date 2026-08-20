@@ -519,6 +519,19 @@ h1, h2, h3, .login-title, .page-title, .card-title, .sidebar-logo-text, .modal-h
   gap: 8px;
 }
 
+/* Pulizia Esterni always has exactly its two zones (Taglio Erba, Pulizia
+   Piazzale) fill the row edge-to-edge, rather than the auto-fill sizing
+   used elsewhere which can leave empty space on wide screens. */
+#settembre-esterni-cleaning-list {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 600px) {
+  #settembre-esterni-cleaning-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .house-part-name {
   font-weight: 600;
   color: var(--text-main);

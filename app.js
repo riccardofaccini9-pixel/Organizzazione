@@ -69,6 +69,17 @@ const SETTEMBRE_TASK_TIME_WINDOWS = {
 // against every day's shower schedule rather than a single day.
 const ZONE_CLEANING_TIME_WINDOW = { start: "8:30", end: "9:00" };
 
+// SETTEMBRE: washing machine shifts - 3 per day, aspiranti only, one per
+// person per week (the rest default to "Bucato Comune").
+const LAVATRICI_TURNI = ["turno1", "turno2", "turno3"];
+const LAVATRICI_TIMES = {
+  turno1: { label: "Turno 1", start: "9:00", end: "10:30" },
+  turno2: { label: "Turno 2", start: "10:45", end: "12:15" },
+  turno3: { label: "Turno 3", start: "15:00", end: "16:30" }
+};
+const LAVATRICI_BUCATO_COMUNE = "Bucato Comune";
+const LAVATRICI_RECUPERO = "Recupero";
+
 function parseTimeToMinutes(t) {
   const [h, m] = t.trim().split(":").map(Number);
   return h * 60 + m;
@@ -1419,6 +1430,7 @@ function createBlankSettembreCalendar() {
     esterniCleaning: {},
     weekly: {},
     eveningCheck: {},
+    lavatrici: {},
     exceptions: []
   };
 
@@ -1428,6 +1440,11 @@ function createBlankSettembreCalendar() {
 
   state.settembreEsterniParts.forEach(zone => {
     cal.esterniCleaning[zone.id] = { assigned: [], helpers: [] };
+  });
+
+  LAVATRICI_TURNI.forEach(turno => {
+    cal.lavatrici[turno] = {};
+    WIZARD_DAYS.forEach(day => { cal.lavatrici[turno][day] = ""; });
   });
 
   WIZARD_DAYS.forEach(day => {
@@ -1818,6 +1835,14 @@ function saveEditedSettembreCalendarState() {
       if (eveningSupervisoreSelect) state.settembreCalendar.eveningCheck[day].supervisore = eveningSupervisoreSelect.value;
       if (eveningAspiranteSelect) state.settembreCalendar.eveningCheck[day].aspirante = eveningAspiranteSelect.value;
     }
+
+    LAVATRICI_TURNI.forEach(turno => {
+      const select = document.getElementById(`edit-settembre-lavatrici-${turno}-${day}`);
+      if (select) {
+        if (!state.settembreCalendar.lavatrici[turno]) state.settembreCalendar.lavatrici[turno] = {};
+        state.settembreCalendar.lavatrici[turno][day] = select.value;
+      }
+    });
   });
 
   persistState("settembreCalendar", state.settembreCalendar);
@@ -2036,6 +2061,28 @@ function renderSettembreCalendar() {
       settembreEveningCheckList.appendChild(pill);
     });
   }
+
+  // RENDER TURNI LAVATRICI - aspiranti only, single-value <select> per cell
+  // (a person's name, or the "Bucato Comune"/"Recupero" placeholders).
+  LAVATRICI_TURNI.forEach(turno => {
+    WIZARD_DAYS.forEach(day => {
+      const td = document.querySelector(`#settembre-lavatrici-table-body tr[data-turno="${turno}"] td[data-day="${day}"]`);
+      if (!td) return;
+      const value = (state.settembreCalendar.lavatrici[turno] && state.settembreCalendar.lavatrici[turno][day]) || "";
+
+      if (state.isSettembreUnlocked) {
+        const options = [
+          `<option value="">-</option>`,
+          ...aspirantiRoster.map(c => `<option value="${escapeHtml(c.name)}" ${value === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`),
+          `<option value="${LAVATRICI_BUCATO_COMUNE}" ${value === LAVATRICI_BUCATO_COMUNE ? 'selected' : ''}>${LAVATRICI_BUCATO_COMUNE}</option>`,
+          `<option value="${LAVATRICI_RECUPERO}" ${value === LAVATRICI_RECUPERO ? 'selected' : ''}>${LAVATRICI_RECUPERO}</option>`
+        ];
+        td.innerHTML = `<select id="edit-settembre-lavatrici-${turno}-${day}" class="input-field" style="padding: 6px; font-size: 12px; width: 100%;">${options.join('')}</select>`;
+      } else {
+        td.innerHTML = escapeHtml(value) || "-";
+      }
+    });
+  });
 }
 
 // "COSA FACCIO OGGI?" SEARCH
@@ -3025,6 +3072,64 @@ function generateSettembreCalendar() {
       supervisore: selectedSupervisore ? selectedSupervisore.name : "",
       aspirante: selectedAspirante ? selectedAspirante.name : ""
     };
+  });
+
+  // TURNI LAVATRICI - aspiranti only, exactly one turn per person for the
+  // week; everything else defaults to "Bucato Comune". Computed last since
+  // it has to avoid whatever mansioni/docce/pulizie were already assigned
+  // above (a person can't be in two places at once): for each candidate on
+  // a given day, collect every time window they're already committed to
+  // (shower, a kitchen mansione with a known time window, zone cleaning)
+  // and skip them for any lavatrici slot that overlaps.
+  function getOccupiedWindowsForNameOnDay(name, day) {
+    const windows = [];
+    const aspiranteMatch = state.settembreAspiranti.find(a => a.name === name);
+    if (aspiranteMatch) {
+      windows.push(...getShowerRangesForCandidateOnDay(aspiranteMatch.id, day));
+    }
+    (newCalendar.weekly[day] || []).forEach(taskInst => {
+      const taskWindows = SETTEMBRE_TASK_TIME_WINDOWS[taskInst.name.trim().toLowerCase()];
+      if (taskWindows && taskInst.assigned.includes(name)) {
+        windows.push(...taskWindows);
+      }
+    });
+    [newCalendar.houseCleaning, newCalendar.esterniCleaning].forEach(cleaningMap => {
+      Object.values(cleaningMap).forEach(data => {
+        const isPrimary = (data.assigned || []).includes(name);
+        const isHelperToday = (data.helpers || []).some(h => h.name === name && h.days.includes(day.slice(0, 3)));
+        if (isPrimary || isHelperToday) {
+          windows.push(ZONE_CLEANING_TIME_WINDOW);
+        }
+      });
+    });
+    return windows;
+  }
+
+  const aspirantiForLavatrici = activeCandidates.filter(c => c.kind === "aspirante");
+  const hasWashedThisWeek = {};
+  aspirantiForLavatrici.forEach(c => { hasWashedThisWeek[c.id] = false; });
+
+  WIZARD_DAYS.forEach(day => {
+    LAVATRICI_TURNI.forEach(turno => {
+      const turnoWindow = LAVATRICI_TIMES[turno];
+      const candidates = aspirantiForLavatrici.filter(c => {
+        if (hasWashedThisWeek[c.id]) return false;
+        if (!isCandidatePresent(c, day)) return false;
+        const occupied = getOccupiedWindowsForNameOnDay(c.name, day);
+        return !occupied.some(w => timeRangesOverlap(w.start, w.end, turnoWindow.start, turnoWindow.end));
+      });
+
+      if (candidates.length === 0) {
+        newCalendar.lavatrici[turno][day] = LAVATRICI_BUCATO_COMUNE;
+        return;
+      }
+
+      candidates.sort((a, b) => loadCounts[a.id] - loadCounts[b.id]);
+      const selected = candidates[0];
+      hasWashedThisWeek[selected.id] = true;
+      loadCounts[selected.id] += 2;
+      newCalendar.lavatrici[turno][day] = selected.name;
+    });
   });
 
   state.settembreCalendar = newCalendar;

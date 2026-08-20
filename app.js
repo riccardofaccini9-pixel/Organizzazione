@@ -48,6 +48,53 @@ const SHOWER_SCHEDULE = {
   }
 };
 
+// SETTEMBRE: internal-only time windows (never shown anywhere in the UI,
+// unlike SHOWER_TIMES) used purely so the generator doesn't assign someone
+// to a meal/kitchen duty while they're scheduled for a shower. Matched by
+// exact task name (case-insensitive) - if no task with that name exists,
+// this simply never triggers.
+const SETTEMBRE_TASK_TIME_WINDOWS = {
+  "cucina pranzo": { start: "11:45", end: "12:50" },
+  "pranzo": { start: "12:50", end: "14:00" },
+  "cucina cena": { start: "18:30", end: "19:20" },
+  "cena": { start: "19:20", end: "20:00" }
+};
+// Zone di Pulizia ("Pulizia Casa") isn't a per-day task - its primary
+// assignee cleans every day of the week - so this is checked against every
+// day's shower schedule rather than a single day.
+const PULIZIA_CASA_TIME_WINDOW = { start: "8:30", end: "9:00" };
+
+function parseTimeToMinutes(t) {
+  const [h, m] = t.trim().split(":").map(Number);
+  return h * 60 + m;
+}
+
+function timeRangesOverlap(startA, endA, startB, endB) {
+  return parseTimeToMinutes(startA) < parseTimeToMinutes(endB) && parseTimeToMinutes(startB) < parseTimeToMinutes(endA);
+}
+
+// Which shower time range(s), if any, a given aspirante slot id (e.g. "u1")
+// falls into on a given day, per the fixed SHOWER_SCHEDULE.
+function getShowerRangesForCandidateOnDay(candidateId, day) {
+  const ranges = [];
+  ["mattina", "pomeriggio", "sera"].forEach(shift => {
+    const slots = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
+    if (slots.includes(candidateId)) {
+      const [start, end] = SHOWER_TIMES[shift].split(" - ");
+      ranges.push({ start, end });
+    }
+  });
+  return ranges;
+}
+
+function isCandidateShoweringDuring(candidateId, day, windowStart, windowEnd) {
+  return getShowerRangesForCandidateOnDay(candidateId, day).some(r => timeRangesOverlap(r.start, r.end, windowStart, windowEnd));
+}
+
+function hasAnyShowerOverlapWithWindow(candidateId, windowStart, windowEnd) {
+  return WIZARD_DAYS.some(day => isCandidateShoweringDuring(candidateId, day, windowStart, windowEnd));
+}
+
 // WIZARD STATE
 let wizardSelectedAbsent = [];
 let wizardSettembreSelectedAbsent = [];
@@ -2512,7 +2559,11 @@ function generateSettembreCalendar() {
       const linkedChildrenForMinP = sortedTasks.filter(t => t.linkedTask === task.id);
       const minP = task.minPeople;
       const assignedCandidates = [];
-      const eligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, task.target));
+      let eligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, task.target));
+      const taskTimeWindow = SETTEMBRE_TASK_TIME_WINDOWS[task.name.trim().toLowerCase()];
+      if (taskTimeWindow) {
+        eligiblePool = eligiblePool.filter(c => !isCandidateShoweringDuring(c.id, day, taskTimeWindow.start, taskTimeWindow.end));
+      }
 
       for (let i = 0; i < minP; i++) {
         let candidates = eligiblePool.filter(c => !assignedCandidates.includes(c) && !dailyHardExcluded.has(c.id) && !usedForThisPriority.has(c.id));
@@ -2654,8 +2705,9 @@ function generateSettembreCalendar() {
   // present people distributed as helpers), but the eligible pool is
   // aspiranti only.
   const settembreZones = [...state.settembreHouseParts].sort((a, b) => a.priority - b.priority);
-  const fullyPresentAspirantiForZones = fullyPresentCandidates.filter(c => c.kind === "aspirante");
-  const activeAspirantiForZones = activeCandidates.filter(c => c.kind === "aspirante");
+  const notShoweringDuringPulizia = c => !hasAnyShowerOverlapWithWindow(c.id, PULIZIA_CASA_TIME_WINDOW.start, PULIZIA_CASA_TIME_WINDOW.end);
+  const fullyPresentAspirantiForZones = fullyPresentCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringPulizia(c));
+  const activeAspirantiForZones = activeCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringPulizia(c));
   const settembreZonePrimaryPool = fullyPresentAspirantiForZones.length > 0 ? fullyPresentAspirantiForZones : activeAspirantiForZones;
 
   settembreZones.forEach(zone => {

@@ -245,6 +245,32 @@ function handleLoadError(err) {
   }
 }
 
+// Embedding contexts (e.g. an iframe loaded with ?embed=aspirante) force the
+// read-only aspirante view regardless of any admin session already stored
+// for this browser tab, and never touch sessionStorage themselves - so an
+// admin session open in another iframe of the same tab is never read from
+// or disturbed by this. Called from both completeBootstrap() and every
+// later poll tick: state.people can still be empty the first time this runs
+// (e.g. the 8s no-response safety net fired before the real data arrived,
+// which happens on PythonAnywhere free-tier cold starts) and returns false
+// in that case, so the caller keeps retrying until the person list is
+// actually there instead of permanently falling back to the login screen.
+function tryEmbedLogin() {
+  const embedMode = new URLSearchParams(location.search).get("embed");
+  if (embedMode !== "aspirante") return false;
+  const aspiranteUser = state.people.find(p => p.email.trim().toLowerCase() === "aspirante@settembre.local");
+  if (!aspiranteUser) return false;
+  state.currentUser = aspiranteUser;
+  showApp();
+  // Belt-and-suspenders on top of the existing admin-only/aspirante-hide
+  // role classes: guarantee the sidebar (nav, "Genera calendario", logout,
+  // etc.) and both lock-to-edit buttons are gone in embed mode, regardless
+  // of any gap in that role logic, so this view can never be used to make
+  // edits.
+  document.querySelectorAll(".sidebar, .lock-toggle-btn").forEach(el => el.style.display = "none");
+  return true;
+}
+
 function completeBootstrap() {
   if (appBootstrapped) return;
   appBootstrapped = true;
@@ -254,26 +280,7 @@ function completeBootstrap() {
     loginConnectionWarning.style.display = "none";
   }
 
-  // Embedding contexts (e.g. an iframe loaded with ?embed=aspirante) force
-  // the read-only aspirante view regardless of any admin session already
-  // stored for this browser tab, and never touch sessionStorage themselves -
-  // so an admin session open in another iframe of the same tab is never
-  // read from or disturbed by this.
-  const embedMode = new URLSearchParams(location.search).get("embed");
-  if (embedMode === "aspirante") {
-    const aspiranteUser = state.people.find(p => p.email.trim().toLowerCase() === "aspirante@settembre.local");
-    if (aspiranteUser) {
-      state.currentUser = aspiranteUser;
-      showApp();
-      // Belt-and-suspenders on top of the existing admin-only/aspirante-hide
-      // role classes: guarantee the sidebar (nav, "Genera calendario",
-      // logout, etc.) and both lock-to-edit buttons are gone in embed mode,
-      // regardless of any gap in that role logic, so this view can never be
-      // used to make edits.
-      document.querySelectorAll(".sidebar, .lock-toggle-btn").forEach(el => el.style.display = "none");
-      return;
-    }
-  }
+  if (tryEmbedLogin()) return;
 
   // Auto Login if session exists (using sessionStorage for temporary login state)
   const loggedUser = sessionStorage.getItem("logged_in_user");
@@ -372,6 +379,8 @@ async function pollServerState() {
     applyServerState(data);
     if (!appBootstrapped) {
       completeBootstrap();
+    } else if (!state.currentUser) {
+      tryEmbedLogin();
     } else {
       refreshLiveUI();
     }

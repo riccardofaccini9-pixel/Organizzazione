@@ -254,6 +254,21 @@ function completeBootstrap() {
     loginConnectionWarning.style.display = "none";
   }
 
+  // Embedding contexts (e.g. an iframe loaded with ?embed=aspirante) force
+  // the read-only aspirante view regardless of any admin session already
+  // stored for this browser tab, and never touch sessionStorage themselves -
+  // so an admin session open in another iframe of the same tab is never
+  // read from or disturbed by this.
+  const embedMode = new URLSearchParams(location.search).get("embed");
+  if (embedMode === "aspirante") {
+    const aspiranteUser = state.people.find(p => p.email.trim().toLowerCase() === "aspirante@settembre.local");
+    if (aspiranteUser) {
+      state.currentUser = aspiranteUser;
+      showApp();
+      return;
+    }
+  }
+
   // Auto Login if session exists (using sessionStorage for temporary login state)
   const loggedUser = sessionStorage.getItem("logged_in_user");
   if (loggedUser) {

@@ -265,6 +265,12 @@ function completeBootstrap() {
     if (aspiranteUser) {
       state.currentUser = aspiranteUser;
       showApp();
+      // Belt-and-suspenders on top of the existing admin-only/aspirante-hide
+      // role classes: guarantee the sidebar (nav, "Genera calendario",
+      // logout, etc.) and both lock-to-edit buttons are gone in embed mode,
+      // regardless of any gap in that role logic, so this view can never be
+      // used to make edits.
+      document.querySelectorAll(".sidebar, .lock-toggle-btn").forEach(el => el.style.display = "none");
       return;
     }
   }

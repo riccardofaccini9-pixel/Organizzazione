@@ -10,6 +10,7 @@ let state = {
   settembreTasks: [],
   settembreHouseParts: [],
   settembreEsterniParts: [],
+  settembreShowerTimes: null,
   settembreCalendar: null,
   isSettembreUnlocked: false
 };
@@ -29,9 +30,13 @@ const DAYS_OF_WEEK = ["venerdì", "sabato", "domenica", "lunedì", "martedì", "
 const WIZARD_DAYS = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
 
 // SETTEMBRE: fixed weekly shower-shift grid (never changes - only the names
-// behind each slot, in state.settembreAspiranti, are editable). Uses the
-// same Lun->Dom order as WIZARD_DAYS.
-const SHOWER_TIMES = { mattina: "7:05 - 7:30", pomeriggio: "13:30 - 13:55", sera: "18:35 - 19:00" };
+// behind each slot, in state.settembreAspiranti, and the times, in
+// state.settembreShowerTimes, are editable). Uses the same Lun->Dom order
+// as WIZARD_DAYS.
+const DEFAULT_SHOWER_TIMES = { mattina: { start: "07:05", end: "07:30" }, pomeriggio: { start: "13:30", end: "13:55" }, sera: { start: "18:35", end: "19:00" } };
+function getShowerTimes() {
+  return state.settembreShowerTimes || DEFAULT_SHOWER_TIMES;
+}
 // 4 uomini (U) + 1 donna (F) per turno, riempiti progressivamente da U1/F1
 // in avanti (con "giro" quando si supera U13/F3) seguendo l'ordine
 // mattina->pomeriggio->sera, lunedì->domenica.
@@ -51,7 +56,7 @@ const SHOWER_SCHEDULE = {
 };
 
 // SETTEMBRE: internal-only time windows (never shown anywhere in the UI,
-// unlike SHOWER_TIMES) used purely so the generator doesn't assign someone
+// unlike the shower times, which ARE shown) used purely so the generator doesn't assign someone
 // to a kitchen duty while they're scheduled for a shower. Matched by exact
 // task name (case-insensitive) - if no task with that name exists, this
 // simply never triggers. "Cucina"/"Aiuto Cucina" cook both lunch and
@@ -96,7 +101,7 @@ function getShowerRangesForCandidateOnDay(candidateId, day) {
   ["mattina", "pomeriggio", "sera"].forEach(shift => {
     const slots = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
     if (slots.includes(candidateId)) {
-      const [start, end] = SHOWER_TIMES[shift].split(" - ");
+      const { start, end } = getShowerTimes()[shift];
       ranges.push({ start, end });
     }
   });
@@ -315,6 +320,10 @@ function refreshLiveUI() {
   if (!document.activeElement || !document.activeElement.closest("#settembre-aspiranti-table-body")) {
     populateSettembreAspirantiTable();
   }
+  // Same polling-clobber guard as above, for the shower-times form.
+  if (!document.activeElement || !document.activeElement.closest("#settembre-shower-times-form")) {
+    populateSettembreShowerTimesForm();
+  }
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();
@@ -369,6 +378,7 @@ function applyServerState(data) {
     priority: (typeof zone.priority === "number") ? zone.priority : 999
   }));
   state.settembreCalendar = data.settembreCalendar || null;
+  state.settembreShowerTimes = data.settembreShowerTimes || DEFAULT_SHOWER_TIMES;
 }
 
 async function pollServerState() {
@@ -463,6 +473,7 @@ function init() {
 
   // SETTEMBRE: Gestione Aspiranti
   document.getElementById("save-settembre-aspiranti-btn").addEventListener("click", saveSettembreAspiranti);
+  document.getElementById("save-settembre-shower-times-btn").addEventListener("click", saveSettembreShowerTimes);
 
   // SETTEMBRE: Mansioni Modal Buttons
   document.getElementById("add-settembre-task-btn").addEventListener("click", () => openAddSettembreTaskModal());
@@ -564,6 +575,7 @@ function showApp() {
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
   populateSettembreAspirantiTable();
+  populateSettembreShowerTimesForm();
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();
@@ -1501,7 +1513,8 @@ function renderShowerTable() {
     const labelCell = document.querySelector(`#shower-table-body tr[data-shift="${shift}"] .laundry-shift-label`);
     if (labelCell) {
       const label = shift.charAt(0).toUpperCase() + shift.slice(1);
-      labelCell.innerHTML = `${label}<br><small>${escapeHtml(SHOWER_TIMES[shift])}</small>`;
+      const { start, end } = getShowerTimes()[shift];
+      labelCell.innerHTML = `${label}<br><small>${escapeHtml(start)} - ${escapeHtml(end)}</small>`;
     }
   });
 
@@ -1546,6 +1559,43 @@ function saveSettembreAspiranti() {
   renderShowerTable();
   renderSettembreCalendar();
   alert("Nomi aspiranti salvati!");
+}
+
+// SETTEMBRE: admin-only editing of the 3 fixed shower-shift times. The
+// shift grid (who showers when) never changes - only these start/end times
+// do, and they also drive the internal conflict-avoidance checks against
+// cooking/laundry/cleaning windows.
+function populateSettembreShowerTimesForm() {
+  const times = getShowerTimes();
+  ["mattina", "pomeriggio", "sera"].forEach(shift => {
+    const startInput = document.getElementById(`settembre-shower-time-${shift}-start`);
+    const endInput = document.getElementById(`settembre-shower-time-${shift}-end`);
+    if (startInput) startInput.value = times[shift].start;
+    if (endInput) endInput.value = times[shift].end;
+  });
+}
+
+function saveSettembreShowerTimes() {
+  const newTimes = {};
+  for (const shift of ["mattina", "pomeriggio", "sera"]) {
+    const startInput = document.getElementById(`settembre-shower-time-${shift}-start`);
+    const endInput = document.getElementById(`settembre-shower-time-${shift}-end`);
+    const start = startInput ? startInput.value.trim() : "";
+    const end = endInput ? endInput.value.trim() : "";
+    if (!start || !end) {
+      alert("Compila tutti gli orari prima di salvare.");
+      return;
+    }
+    if (parseTimeToMinutes(end) <= parseTimeToMinutes(start)) {
+      alert(`L'orario di fine deve essere dopo l'inizio (turno ${shift}).`);
+      return;
+    }
+    newTimes[shift] = { start, end };
+  }
+  state.settembreShowerTimes = newTimes;
+  persistState("settembreShowerTimes", newTimes);
+  renderShowerTable();
+  alert("Orari docce salvati!");
 }
 
 function toggleLock() {

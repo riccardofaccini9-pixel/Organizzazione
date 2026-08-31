@@ -398,6 +398,44 @@
             <button id="save-settembre-aspiranti-btn" class="btn btn-primary" style="width: auto;">Salva Nomi</button>
           </div>
         </div>
+
+        <div class="card">
+          <h3 class="card-title">Orari Docce</h3>
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            Orari di inizio e fine dei 3 turni doccia fissi (mattina, pomeriggio, sera). La griglia di chi fa la doccia quando non cambia: qui si modificano solo gli orari.
+          </p>
+          <div id="settembre-shower-times-form" class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Turno</th>
+                  <th>Inizio</th>
+                  <th>Fine</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Mattina</strong></td>
+                  <td><input type="time" id="settembre-shower-time-mattina-start" class="input-field" style="padding: 6px 10px; font-size: 13px;"></td>
+                  <td><input type="time" id="settembre-shower-time-mattina-end" class="input-field" style="padding: 6px 10px; font-size: 13px;"></td>
+                </tr>
+                <tr>
+                  <td><strong>Pomeriggio</strong></td>
+                  <td><input type="time" id="settembre-shower-time-pomeriggio-start" class="input-field" style="padding: 6px 10px; font-size: 13px;"></td>
+                  <td><input type="time" id="settembre-shower-time-pomeriggio-end" class="input-field" style="padding: 6px 10px; font-size: 13px;"></td>
+                </tr>
+                <tr>
+                  <td><strong>Sera</strong></td>
+                  <td><input type="time" id="settembre-shower-time-sera-start" class="input-field" style="padding: 6px 10px; font-size: 13px;"></td>
+                  <td><input type="time" id="settembre-shower-time-sera-end" class="input-field" style="padding: 6px 10px; font-size: 13px;"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-actions" style="justify-content: flex-end; margin-top: 12px;">
+            <button id="save-settembre-shower-times-btn" class="btn btn-primary" style="width: auto;">Salva Orari</button>
+          </div>
+        </div>
       </section>
 
       <!-- TAB: GESTIONE MANSIONI SETTEMBRE (visible only from within the Settembre context) -->

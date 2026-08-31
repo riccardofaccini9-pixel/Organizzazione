@@ -75,6 +75,16 @@ DEFAULT_SETTEMBRE_ESTERNI_PARTS = [
     {"id": "esterni-2", "name": "Pulizia Piazzale", "minPeople": 2, "priority": 2},
 ]
 
+# Editable start/end times for the 3 fixed shower shifts (the grid of who
+# showers when never changes - only these times do). Used both for display
+# in the Turni Docce table and internally to keep cooking/laundry/cleaning
+# assignments from overlapping a shower.
+DEFAULT_SETTEMBRE_SHOWER_TIMES = {
+    "mattina": {"start": "07:05", "end": "07:30"},
+    "pomeriggio": {"start": "13:30", "end": "13:55"},
+    "sera": {"start": "18:35", "end": "19:00"},
+}
+
 DEFAULTS = {
     "people": DEFAULT_PEOPLE,
     "tasks": DEFAULT_TASKS,
@@ -83,6 +93,7 @@ DEFAULTS = {
     "settembreTasks": DEFAULT_SETTEMBRE_TASKS,
     "settembreHouseParts": DEFAULT_SETTEMBRE_HOUSE_PARTS,
     "settembreEsterniParts": DEFAULT_SETTEMBRE_ESTERNI_PARTS,
+    "settembreShowerTimes": DEFAULT_SETTEMBRE_SHOWER_TIMES,
 }
 
 VALID_KEYS = {
@@ -95,6 +106,7 @@ VALID_KEYS = {
     "settembreHouseParts",
     "settembreEsterniParts",
     "settembreCalendar",
+    "settembreShowerTimes",
 }
 
 
@@ -173,6 +185,7 @@ def get_all_state():
         "settembreHouseParts": data.get("settembreHouseParts", []),
         "settembreEsterniParts": data.get("settembreEsterniParts", []),
         "settembreCalendar": data.get("settembreCalendar"),
+        "settembreShowerTimes": data.get("settembreShowerTimes", DEFAULT_SETTEMBRE_SHOWER_TIMES),
     }
 
 

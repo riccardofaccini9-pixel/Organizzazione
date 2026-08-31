@@ -208,6 +208,12 @@ const searchDayInput = document.getElementById("search-day-input");
 const searchTodayResults = document.getElementById("search-today-results");
 const calendarFullView = document.getElementById("calendar-full-view");
 
+// "Cosa faccio oggi?" search (SETTEMBRE)
+const settembreSearchPersonInput = document.getElementById("settembre-search-person-input");
+const settembreSearchDayInput = document.getElementById("settembre-search-day-input");
+const settembreSearchTodayResults = document.getElementById("settembre-search-today-results");
+const settembreCalendarFullView = document.getElementById("settembre-calendar-full-view");
+
 // Wizard Elements
 const startWizardBtn = document.getElementById("start-wizard-btn");
 const genStepInit = document.getElementById("gen-step-init");
@@ -311,6 +317,7 @@ function refreshLiveUI() {
   populateHousePartsTable();
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
+  populateSettembreSearchPersonDropdown();
   // Gestione Aspiranti has no lock/unlock like the calendars - its name
   // inputs are always live-editable - so the same polling-clobber problem
   // applies here too: rebuilding the table mid-edit would wipe out
@@ -461,6 +468,8 @@ function init() {
   // "Cosa faccio oggi?" search (runs as soon as either dropdown changes)
   searchPersonInput.addEventListener("change", runTodaySearch);
   searchDayInput.addEventListener("change", runTodaySearch);
+  settembreSearchPersonInput.addEventListener("change", runSettembreTodaySearch);
+  settembreSearchDayInput.addEventListener("change", runSettembreTodaySearch);
 
   // Wizard Buttons
   startWizardBtn.addEventListener("click", startWizard);
@@ -574,6 +583,7 @@ function showApp() {
   populateHousePartsTable();
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
+  populateSettembreSearchPersonDropdown();
   populateSettembreAspirantiTable();
   populateSettembreShowerTimesForm();
   populateSettembreTasksTable();
@@ -659,6 +669,21 @@ function populateSearchPersonDropdown() {
   // Keep the current selection if that person still exists
   if ([...searchPersonInput.options].some(o => o.value === previousValue)) {
     searchPersonInput.value = previousValue;
+  }
+}
+
+function populateSettembreSearchPersonDropdown() {
+  const previousValue = settembreSearchPersonInput.value;
+  settembreSearchPersonInput.innerHTML = '<option value="">Tutte le persone</option>';
+  getSettembreRoster().forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.name;
+    settembreSearchPersonInput.appendChild(opt);
+  });
+  // Keep the current selection if that person still exists
+  if ([...settembreSearchPersonInput.options].some(o => o.value === previousValue)) {
+    settembreSearchPersonInput.value = previousValue;
   }
 }
 
@@ -2276,6 +2301,141 @@ function runTodaySearch() {
     html += `<ul class="desc-list">${dailyResults.map(r => `<li><strong>${escapeHtml(r.day)}</strong>: ${r.text}</li>`).join('')}</ul>`;
   }
   searchTodayResults.innerHTML = html;
+}
+
+// Same as runTodaySearch(), adapted to the Settembre roster/calendar shape
+// (WIZARD_DAYS lun->dom order, eveningCheck split into supervisore/aspirante,
+// esterniCleaning zones, lavatrici turni, and the fixed shower schedule -
+// none of which exist on the main scheda).
+function runSettembreTodaySearch() {
+  const personQuery = settembreSearchPersonInput.value.trim().toLowerCase();
+  const dayQuery = settembreSearchDayInput.value.trim().toLowerCase();
+
+  if (!personQuery) {
+    settembreCalendarFullView.style.display = "";
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Seleziona una persona per vedere le sue attività.</p>`;
+    return;
+  }
+
+  settembreCalendarFullView.style.display = "none";
+
+  if (!state.settembreCalendar) {
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessun calendario generato.</p>`;
+    return;
+  }
+
+  const nameMatches = (name) => name && name.toLowerCase().includes(personQuery);
+  const dayMatches = (day) => !dayQuery || day.toLowerCase().startsWith(dayQuery);
+
+  const weeklyDuties = [];
+
+  if (state.settembreCalendar.meterAssignee && nameMatches(state.settembreCalendar.meterAssignee)) {
+    weeklyDuties.push(`Lettura Contatori — ${escapeHtml(state.settembreCalendar.meterAssignee)}`);
+  }
+  if (state.settembreCalendar.porchAssignee && nameMatches(state.settembreCalendar.porchAssignee)) {
+    weeklyDuties.push(`Pulizia Portico — ${escapeHtml(state.settembreCalendar.porchAssignee)}`);
+  }
+
+  state.settembreHouseParts.forEach(zone => {
+    const data = state.settembreCalendar.houseCleaning[zone.id];
+    if (!data) return;
+    (data.assigned || []).forEach(name => {
+      if (nameMatches(name)) {
+        weeklyDuties.push(`Pulizia Casa: ${escapeHtml(zone.name)} — ${escapeHtml(name)}`);
+      }
+    });
+  });
+
+  state.settembreEsterniParts.forEach(zone => {
+    const data = state.settembreCalendar.esterniCleaning[zone.id];
+    if (!data) return;
+    (data.assigned || []).forEach(name => {
+      if (nameMatches(name)) {
+        weeklyDuties.push(`Pulizia Esterni: ${escapeHtml(zone.name)} — ${escapeHtml(name)}`);
+      }
+    });
+  });
+
+  const dailyResults = []; // { day, text }
+
+  WIZARD_DAYS.forEach(day => {
+    if (!dayMatches(day)) return;
+
+    (state.settembreCalendar.weekly[day] || []).forEach(taskInst => {
+      taskInst.assigned.forEach(name => {
+        if (nameMatches(name)) {
+          dailyResults.push({ day, text: `${escapeHtml(taskInst.name)} — ${escapeHtml(name)}` });
+        }
+      });
+    });
+
+    const evening = state.settembreCalendar.eveningCheck[day];
+    if (evening) {
+      if (evening.supervisore && nameMatches(evening.supervisore)) {
+        dailyResults.push({ day, text: `Controllo Serale — ${escapeHtml(evening.supervisore)}` });
+      }
+      if (evening.aspirante && nameMatches(evening.aspirante)) {
+        dailyResults.push({ day, text: `Controllo Serale — ${escapeHtml(evening.aspirante)}` });
+      }
+    }
+
+    LAVATRICI_TURNI.forEach(turno => {
+      const name = state.settembreCalendar.lavatrici[turno] && state.settembreCalendar.lavatrici[turno][day];
+      if (name && name !== LAVATRICI_BUCATO_COMUNE && name !== LAVATRICI_RECUPERO && nameMatches(name)) {
+        dailyResults.push({ day, text: `Lavatrice ${LAVATRICI_TIMES[turno].label} — ${escapeHtml(name)}` });
+      }
+    });
+
+    const dayAbbrev = day.slice(0, 3);
+    state.settembreHouseParts.forEach(zone => {
+      const data = state.settembreCalendar.houseCleaning[zone.id];
+      if (!data || !data.helpers) return;
+      data.helpers.forEach(h => {
+        if (nameMatches(h.name) && h.days.includes(dayAbbrev)) {
+          dailyResults.push({ day, text: `Aiuto Pulizia Casa: ${escapeHtml(zone.name)} — ${escapeHtml(h.name)}` });
+        }
+      });
+    });
+    state.settembreEsterniParts.forEach(zone => {
+      const data = state.settembreCalendar.esterniCleaning[zone.id];
+      if (!data || !data.helpers) return;
+      data.helpers.forEach(h => {
+        if (nameMatches(h.name) && h.days.includes(dayAbbrev)) {
+          dailyResults.push({ day, text: `Aiuto Pulizia Esterni: ${escapeHtml(zone.name)} — ${escapeHtml(h.name)}` });
+        }
+      });
+    });
+
+    // Fixed shower schedule - not part of settembreCalendar, resolved from
+    // SHOWER_SCHEDULE + state.settembreAspiranti like renderShowerTable().
+    ["mattina", "pomeriggio", "sera"].forEach(shift => {
+      const slotIds = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
+      slotIds.forEach(slotId => {
+        const aspirante = state.settembreAspiranti.find(a => a.id === slotId);
+        if (aspirante && nameMatches(aspirante.name)) {
+          const { start, end } = getShowerTimes()[shift];
+          const label = shift.charAt(0).toUpperCase() + shift.slice(1);
+          dailyResults.push({ day, text: `Doccia ${label} (${escapeHtml(start)} - ${escapeHtml(end)}) — ${escapeHtml(aspirante.name)}` });
+        }
+      });
+    });
+  });
+
+  if (weeklyDuties.length === 0 && dailyResults.length === 0) {
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessuna attività trovata per i criteri inseriti.</p>`;
+    return;
+  }
+
+  let html = "";
+  if (weeklyDuties.length > 0) {
+    html += `<div class="search-today-section-title">Impegni per tutta la settimana</div>`;
+    html += `<ul class="desc-list">${weeklyDuties.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  }
+  if (dailyResults.length > 0) {
+    html += `<div class="search-today-section-title">Attività giornaliere</div>`;
+    html += `<ul class="desc-list">${dailyResults.map(r => `<li><strong>${escapeHtml(r.day)}</strong>: ${r.text}</li>`).join('')}</ul>`;
+  }
+  settembreSearchTodayResults.innerHTML = html;
 }
 
 // GENERATION WIZARD LOGIC

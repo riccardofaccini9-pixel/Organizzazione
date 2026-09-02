@@ -402,7 +402,7 @@
         <div class="card">
           <h3 class="card-title">Turni Docce</h3>
           <p style="color: var(--text-muted); margin-bottom: 16px;">
-            Chi fa la doccia in ogni turno/giorno. Scrivi i codici slot separati da virgola (es. "U1, U2, U3, U4, F1") o usa il menu sotto ogni casella per aggiungerli.
+            Chi fa la doccia in ogni turno/giorno. Scrivi i codici slot separati da virgola (es. "U1, U2, U3, U4, F1"), usa il menu sotto ogni casella per aggiungerli, o il bottone Rimuovi per toglierne uno per nome. "Ricalcola" rigenera da zero tutta la tabella (4 uomini + 1 donna a turno, nessuno doppio turno lo stesso giorno, a rotazione equa).
           </p>
           <div class="table-responsive">
             <table class="data-table">
@@ -452,7 +452,8 @@
               </tbody>
             </table>
           </div>
-          <div class="modal-actions" style="justify-content: flex-end; margin-top: 12px;">
+          <div class="modal-actions" style="justify-content: space-between; margin-top: 12px;">
+            <button id="recalculate-settembre-shower-schedule-btn" class="btn btn-secondary" style="width: auto;">Ricalcola</button>
             <button id="save-settembre-shower-schedule-btn" class="btn btn-primary" style="width: auto;">Salva Turni</button>
           </div>
         </div>

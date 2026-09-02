@@ -493,6 +493,7 @@ function init() {
   // SETTEMBRE: Gestione Aspiranti
   document.getElementById("save-settembre-aspiranti-btn").addEventListener("click", saveSettembreAspiranti);
   document.getElementById("save-settembre-shower-schedule-btn").addEventListener("click", saveSettembreShowerSchedule);
+  document.getElementById("recalculate-settembre-shower-schedule-btn").addEventListener("click", recalculateSettembreShowerSchedule);
   document.getElementById("close-shower-schedule-remove-btn").addEventListener("click", () => closeModal(document.getElementById("modal-shower-schedule-remove")));
   document.getElementById("confirm-shower-schedule-remove-btn").addEventListener("click", confirmShowerScheduleRemove);
   document.getElementById("save-settembre-shower-times-btn").addEventListener("click", saveSettembreShowerTimes);
@@ -1759,6 +1760,64 @@ function saveSettembreShowerSchedule() {
   } else {
     alert("Turni docce salvati!");
   }
+}
+
+// SETTEMBRE: full from-scratch regeneration of the shower schedule (all 21
+// cells), replacing whatever is currently saved (including manual edits).
+// Rules:
+// - 4 uomini + 1 donna per turno (3 turni/giorno: mattina, pomeriggio, sera)
+// - una persona non può comparire in più di un turno lo stesso giorno
+// - round-robin per genere: nessuno riceve un secondo turno prima che tutti
+//   (dello stesso sesso) abbiano ricevuto il primo
+//
+// With exactly 13 uomini and 12 "posti uomo" al giorno (4x3 turni), at most
+// 1 uomo/giorno può restare escluso - la finestra di 12 uomini consecutivi
+// (in ordine di slot, ciclica) che scorre di 12 posizioni al giorno (= -1
+// mod 13) realizza esattamente questo: ogni giorno esclude un uomo diverso,
+// finché in 7 giorni 7 uomini sono stati esclusi una volta (6 turni) e i
+// restanti 6 non sono mai esclusi (7 turni) - la distribuzione più equa
+// possibile dati i numeri. Le 3 donne, invece, essendo esattamente 3 per 3
+// posti/giorno, lavorano sempre tutti i giorni: ruota solo QUALE turno
+// (mattina/pomeriggio/sera) tocca a ciascuna, giorno per giorno.
+function recalculateSettembreShowerSchedule() {
+  const men = state.settembreAspiranti
+    .filter(a => a.gender === "U")
+    .sort((a, b) => parseInt(a.slot.slice(1), 10) - parseInt(b.slot.slice(1), 10));
+  const women = state.settembreAspiranti
+    .filter(a => a.gender === "F")
+    .sort((a, b) => parseInt(a.slot.slice(1), 10) - parseInt(b.slot.slice(1), 10));
+
+  if (men.length < 12 || women.length < 3) {
+    alert(`Servono almeno 12 aspiranti uomini e 3 donne per ricalcolare (attuali: ${men.length} uomini, ${women.length} donne).`);
+    return;
+  }
+
+  const newSchedule = { mattina: {}, pomeriggio: {}, sera: {} };
+  const menPerDay = 12;
+
+  WIZARD_DAYS.forEach((day, dayIndex) => {
+    const startIdx = (dayIndex * menPerDay) % men.length;
+    const dayMen = [];
+    for (let i = 0; i < menPerDay; i++) {
+      dayMen.push(men[(startIdx + i) % men.length]);
+    }
+    const menChunks = [dayMen.slice(0, 4), dayMen.slice(4, 8), dayMen.slice(8, 12)];
+
+    const womenOffset = dayIndex % women.length;
+    const shiftWomen = [0, 1, 2].map(shiftIdx => women[(womenOffset + shiftIdx) % women.length]);
+
+    ["mattina", "pomeriggio", "sera"].forEach((shift, shiftIdx) => {
+      const ids = menChunks[shiftIdx].map(m => m.id);
+      ids.push(shiftWomen[shiftIdx].id);
+      newSchedule[shift][day] = ids;
+    });
+  });
+
+  state.settembreShowerSchedule = newSchedule;
+  persistState("settembreShowerSchedule", newSchedule);
+  populateSettembreShowerScheduleForm();
+  renderShowerTable();
+  alert("Turni docce ricalcolati!");
 }
 
 function toggleLock() {

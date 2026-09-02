@@ -534,6 +534,29 @@
         </div>
 
         <div class="card">
+          <h3 class="card-title">Orari Mansioni</h3>
+          <p style="color: var(--text-muted); margin-bottom: 16px;">
+            Orari (opzionali, interni - non compaiono da nessuna parte) usati solo per evitare di assegnare qualcuno a una mansione mentre ha la doccia. Una mansione conta come una sola attività anche se assegnata a più persone. Formato: "HH:MM-HH:MM", anche più di uno separati da virgola (es. "11:45-12:50, 18:30-19:20"). Lascia vuoto per nessun vincolo.
+          </p>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mansione</th>
+                  <th>Orari</th>
+                </tr>
+              </thead>
+              <tbody id="settembre-task-time-windows-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-actions" style="justify-content: flex-end; margin-top: 12px;">
+            <button id="save-settembre-task-time-windows-btn" class="btn btn-primary" style="width: auto;">Salva Orari Mansioni</button>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="page-header" style="margin-bottom: 16px;">
             <h3 class="card-title" style="margin-bottom: 0;">Zone di Pulizia</h3>
             <div class="header-actions">

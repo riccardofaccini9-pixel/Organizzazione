@@ -116,6 +116,7 @@ DEFAULTS = {
     "settembreEsterniParts": DEFAULT_SETTEMBRE_ESTERNI_PARTS,
     "settembreShowerTimes": DEFAULT_SETTEMBRE_SHOWER_TIMES,
     "settembreShowerSchedule": DEFAULT_SETTEMBRE_SHOWER_SCHEDULE,
+    "settembreTaskTimeWindows": {},
 }
 
 VALID_KEYS = {
@@ -130,6 +131,7 @@ VALID_KEYS = {
     "settembreCalendar",
     "settembreShowerTimes",
     "settembreShowerSchedule",
+    "settembreTaskTimeWindows",
 }
 
 
@@ -210,6 +212,7 @@ def get_all_state():
         "settembreCalendar": data.get("settembreCalendar"),
         "settembreShowerTimes": data.get("settembreShowerTimes", DEFAULT_SETTEMBRE_SHOWER_TIMES),
         "settembreShowerSchedule": data.get("settembreShowerSchedule", DEFAULT_SETTEMBRE_SHOWER_SCHEDULE),
+        "settembreTaskTimeWindows": data.get("settembreTaskTimeWindows", {}),
     }
 
 

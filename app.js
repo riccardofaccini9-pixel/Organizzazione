@@ -12,6 +12,7 @@ let state = {
   settembreEsterniParts: [],
   settembreShowerTimes: null,
   settembreShowerSchedule: null,
+  settembreTaskTimeWindows: {},
   settembreCalendar: null,
   isSettembreUnlocked: false
 };
@@ -59,23 +60,52 @@ function getShowerSchedule() {
   return state.settembreShowerSchedule || DEFAULT_SHOWER_SCHEDULE;
 }
 
-// SETTEMBRE: internal-only time windows (never shown anywhere in the UI,
-// unlike the shower times, which ARE shown) used purely so the generator doesn't assign someone
-// to a kitchen duty while they're scheduled for a shower. Matched by exact
-// task name (case-insensitive) - if no task with that name exists, this
-// simply never triggers. "Cucina"/"Aiuto Cucina" cook both lunch and
-// dinner, so each carries both meal windows - a conflict with either counts.
+// SETTEMBRE: per-mansione time windows (never shown anywhere in the UI,
+// unlike the shower times, which ARE shown) used so the generator doesn't
+// assign someone to a mansione while they're scheduled for a shower. Admin-
+// editable per task via the "Orari Mansioni" panel (state.settembreTaskTimeWindows,
+// keyed by task id - a mansione counts as ONE activity even when assigned
+// to multiple people, so it's one set of windows, not per-person). Tasks
+// that have never been explicitly configured fall back to this legacy
+// default (matched by exact name, case-insensitive) so "Cucina"/"Aiuto
+// Cucina" keep working out of the box - both cook lunch AND dinner, so
+// each carries both meal windows, a conflict with either counts.
 const MEAL_PREP_TIME_WINDOWS = [
   { start: "11:45", end: "12:50" }, // cucina pranzo
   { start: "18:30", end: "19:20" }  // cucina cena
 ];
-const SETTEMBRE_TASK_TIME_WINDOWS = {
+const LEGACY_DEFAULT_TASK_TIME_WINDOWS = {
   "cucina": MEAL_PREP_TIME_WINDOWS,
   "aiuto cucina": MEAL_PREP_TIME_WINDOWS
 };
-// Zone di Pulizia ("Pulizia Casa"/"Pulizia Esterni") aren't per-day tasks -
-// their primary assignees clean every day of the week - so this is checked
-// against every day's shower schedule rather than a single day.
+function getTaskTimeWindows(task) {
+  const explicit = state.settembreTaskTimeWindows[task.id];
+  if (explicit !== undefined) return explicit;
+  return LEGACY_DEFAULT_TASK_TIME_WINDOWS[task.name.trim().toLowerCase()] || [];
+}
+// Parses a free-text "HH:MM-HH:MM, HH:MM-HH:MM" field (as used in the Orari
+// Mansioni panel) into a windows array, reporting any malformed tokens so
+// the caller can warn about (and drop) them instead of silently saving junk.
+function parseTimeWindowsInputString(str) {
+  const windows = [];
+  const invalidTokens = [];
+  const timeRe = /^([01]?\d|2[0-3]):[0-5]\d$/;
+  str.split(",").map(s => s.trim()).filter(Boolean).forEach(token => {
+    const parts = token.split("-").map(s => s.trim());
+    const [start, end] = parts;
+    if (parts.length !== 2 || !timeRe.test(start) || !timeRe.test(end) || parseTimeToMinutes(end) <= parseTimeToMinutes(start)) {
+      invalidTokens.push(token);
+      return;
+    }
+    windows.push({ start, end });
+  });
+  return { windows, invalidTokens };
+}
+// Zone di Pulizia: "Pulizia Casa" isn't a per-day task - its primary
+// assignees clean every day of the week - so this is checked against every
+// day's shower schedule rather than a single day. "Pulizia Esterni"
+// deliberately has NO time window (organizational choice, nothing written
+// anywhere) - see assignSettembreZones()'s `applyCleaningWindow` param.
 const ZONE_CLEANING_TIME_WINDOW = { start: "8:30", end: "9:00" };
 
 // SETTEMBRE: washing machine shifts - 3 per day, aspiranti only, one per
@@ -343,6 +373,10 @@ function refreshLiveUI() {
     populateSettembreShowerTimesForm();
   }
   populateSettembreTasksTable();
+  // Same polling-clobber guard as above, for the Orari Mansioni form.
+  if (!document.activeElement || !document.activeElement.closest("#settembre-task-time-windows-body")) {
+    populateSettembreTaskTimeWindowsForm();
+  }
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();
   populateSettembreEsterniPartsTable();
@@ -398,6 +432,7 @@ function applyServerState(data) {
   state.settembreCalendar = data.settembreCalendar || null;
   state.settembreShowerTimes = data.settembreShowerTimes || DEFAULT_SHOWER_TIMES;
   state.settembreShowerSchedule = data.settembreShowerSchedule || DEFAULT_SHOWER_SCHEDULE;
+  state.settembreTaskTimeWindows = data.settembreTaskTimeWindows || {};
 }
 
 async function pollServerState() {
@@ -497,6 +532,7 @@ function init() {
   document.getElementById("save-settembre-aspiranti-btn").addEventListener("click", saveSettembreAspiranti);
   document.getElementById("save-settembre-shower-schedule-btn").addEventListener("click", saveSettembreShowerSchedule);
   document.getElementById("recalculate-settembre-shower-schedule-btn").addEventListener("click", recalculateSettembreShowerSchedule);
+  document.getElementById("save-settembre-task-time-windows-btn").addEventListener("click", saveSettembreTaskTimeWindows);
   document.getElementById("close-shower-schedule-remove-btn").addEventListener("click", () => closeModal(document.getElementById("modal-shower-schedule-remove")));
   document.getElementById("confirm-shower-schedule-remove-btn").addEventListener("click", confirmShowerScheduleRemove);
   document.getElementById("save-settembre-shower-times-btn").addEventListener("click", saveSettembreShowerTimes);
@@ -606,6 +642,7 @@ function showApp() {
   populateSettembreShowerScheduleForm();
   populateSettembreShowerTimesForm();
   populateSettembreTasksTable();
+  populateSettembreTaskTimeWindowsForm();
   updateSettembreLinkedTasksDropdown();
   populateSettembreHousePartsTable();
   populateSettembreEsterniPartsTable();
@@ -953,6 +990,7 @@ function saveSettembreTask() {
 
   closeModal(document.getElementById("modal-settembre-task"));
   populateSettembreTasksTable();
+  populateSettembreTaskTimeWindowsForm();
   updateSettembreLinkedTasksDropdown();
   renderSettembreCalendar();
 }
@@ -966,6 +1004,7 @@ function deleteSettembreTask(id) {
   });
   persistState("settembreTasks", state.settembreTasks);
   populateSettembreTasksTable();
+  populateSettembreTaskTimeWindowsForm();
   updateSettembreLinkedTasksDropdown();
   renderSettembreCalendar();
 }
@@ -981,6 +1020,7 @@ function moveSettembreTask(id, direction) {
 
   persistState("settembreTasks", state.settembreTasks);
   populateSettembreTasksTable();
+  populateSettembreTaskTimeWindowsForm();
   renderSettembreCalendar();
 }
 
@@ -1023,6 +1063,52 @@ function populateSettembreTasksTable() {
     `;
     tbody.appendChild(tr);
   });
+}
+
+// SETTEMBRE: admin-only editing of the internal, never-displayed time
+// window(s) each mansione settimanale occupies, used purely to keep the
+// generator (and the manual-edit conflict check) from double-booking
+// someone into a mansione while they're scheduled for a shower. A mansione
+// counts as a single activity regardless of how many people are assigned
+// to it, so this is one field per task, not per person.
+function populateSettembreTaskTimeWindowsForm() {
+  const tbody = document.getElementById("settembre-task-time-windows-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  [...state.settembreTasks].sort((a, b) => a.priority - b.priority).forEach(task => {
+    const windows = getTaskTimeWindows(task);
+    const value = windows.map(w => `${w.start}-${w.end}`).join(', ');
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(task.name)}</strong></td>
+      <td><input type="text" id="settembre-task-time-windows-${task.id}" class="input-field" style="padding: 6px 10px; font-size: 13px;" value="${escapeHtml(value)}" placeholder="Es. 11:45-12:50, 18:30-19:20"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function saveSettembreTaskTimeWindows() {
+  const newMap = {};
+  const invalidByTask = [];
+
+  state.settembreTasks.forEach(task => {
+    const input = document.getElementById(`settembre-task-time-windows-${task.id}`);
+    const raw = input ? input.value.trim() : "";
+    const { windows, invalidTokens } = parseTimeWindowsInputString(raw);
+    newMap[task.id] = windows;
+    if (invalidTokens.length > 0) {
+      invalidByTask.push(`${task.name}: ${invalidTokens.join(', ')}`);
+    }
+  });
+
+  state.settembreTaskTimeWindows = newMap;
+  persistState("settembreTaskTimeWindows", newMap);
+
+  if (invalidByTask.length > 0) {
+    alert(`Orari mansioni salvati, ma questi intervalli non erano nel formato HH:MM-HH:MM (fine dopo inizio) e sono stati ignorati:\n${invalidByTask.join('\n')}`);
+  } else {
+    alert("Orari mansioni salvati!");
+  }
 }
 
 // SETTEMBRE HOUSE CLEANING ZONES - own list, same shape/fields as the
@@ -2196,8 +2282,9 @@ function checkSettembreShowerConflicts() {
 
   WIZARD_DAYS.forEach(day => {
     (state.settembreCalendar.weekly[day] || []).forEach(taskInst => {
-      const windows = SETTEMBRE_TASK_TIME_WINDOWS[taskInst.name.trim().toLowerCase()];
-      if (!windows) return;
+      const task = state.settembreTasks.find(t => t.id === taskInst.taskId);
+      const windows = task ? getTaskTimeWindows(task) : [];
+      if (windows.length === 0) return;
       taskInst.assigned.forEach(name => {
         const id = nameToAspiranteId(name);
         if (!id) return;
@@ -2208,9 +2295,10 @@ function checkSettembreShowerConflicts() {
     });
   });
 
+  // "Pulizia Esterni" has no time window (organizational choice) - only
+  // "Pulizia Casa" is checked here.
   [
-    { list: state.settembreHouseParts, cleaning: state.settembreCalendar.houseCleaning },
-    { list: state.settembreEsterniParts, cleaning: state.settembreCalendar.esterniCleaning }
+    { list: state.settembreHouseParts, cleaning: state.settembreCalendar.houseCleaning }
   ].forEach(({ list, cleaning }) => {
     list.forEach(zone => {
       const data = cleaning[zone.id];
@@ -3362,8 +3450,8 @@ function generateSettembreCalendar() {
       const minP = task.minPeople;
       const assignedCandidates = [];
       let eligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, task.target));
-      const taskTimeWindows = SETTEMBRE_TASK_TIME_WINDOWS[task.name.trim().toLowerCase()];
-      if (taskTimeWindows) {
+      const taskTimeWindows = getTaskTimeWindows(task);
+      if (taskTimeWindows.length > 0) {
         eligiblePool = eligiblePool.filter(c => !isCandidateShoweringDuringAny(c.id, day, taskTimeWindows));
       }
 
@@ -3422,7 +3510,11 @@ function generateSettembreCalendar() {
       // from the child's own eligible pool.
       let parentPoolPointer = 0;
       linkedChildrenForMinP.forEach(child => {
-        const childEligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, child.target));
+        let childEligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, child.target));
+        const childTimeWindows = getTaskTimeWindows(child);
+        if (childTimeWindows.length > 0) {
+          childEligiblePool = childEligiblePool.filter(c => !isCandidateShoweringDuringAny(c.id, day, childTimeWindows));
+        }
         let childAssigned = [];
         if (child.target === task.target) {
           childAssigned = orderedAssignedCandidates.slice(parentPoolPointer, parentPoolPointer + child.minPeople);
@@ -3507,11 +3599,13 @@ function generateSettembreCalendar() {
   // ZONE DI PULIZIA (Pulizia Casa / Pulizia Esterni) - same approach as the
   // original scheda's house cleaning zones (primaries drawn only from
   // people present all week, partially present people distributed as
-  // helpers), but the eligible pool is aspiranti only, and excludes anyone
-  // showering during the shared cleaning time window on any day.
-  function assignSettembreZones(zoneList, cleaningTarget) {
+  // helpers), but the eligible pool is aspiranti only. Only "Pulizia Casa"
+  // (applyCleaningWindow=true) excludes anyone showering during the shared
+  // cleaning time window - "Pulizia Esterni" has no time window at all
+  // (organizational choice, nothing written anywhere).
+  function assignSettembreZones(zoneList, cleaningTarget, applyCleaningWindow) {
     const zones = [...zoneList].sort((a, b) => a.priority - b.priority);
-    const notShoweringDuringCleaning = c => !hasAnyShowerOverlapWithWindow(c.id, ZONE_CLEANING_TIME_WINDOW.start, ZONE_CLEANING_TIME_WINDOW.end);
+    const notShoweringDuringCleaning = c => !applyCleaningWindow || !hasAnyShowerOverlapWithWindow(c.id, ZONE_CLEANING_TIME_WINDOW.start, ZONE_CLEANING_TIME_WINDOW.end);
     const fullyPresentAspirantiForZones = fullyPresentCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringCleaning(c));
     const activeAspirantiForZones = activeCandidates.filter(c => c.kind === "aspirante" && notShoweringDuringCleaning(c));
     const zonePrimaryPool = fullyPresentAspirantiForZones.length > 0 ? fullyPresentAspirantiForZones : activeAspirantiForZones;
@@ -3548,8 +3642,8 @@ function generateSettembreCalendar() {
     }
   }
 
-  assignSettembreZones(state.settembreHouseParts, newCalendar.houseCleaning);
-  assignSettembreZones(state.settembreEsterniParts, newCalendar.esterniCleaning);
+  assignSettembreZones(state.settembreHouseParts, newCalendar.houseCleaning, true);
+  assignSettembreZones(state.settembreEsterniParts, newCalendar.esterniCleaning, false);
 
   // CONTROLLO SERALE - one supervisore + one aspirante per day, each
   // tracked (and gap-limited) independently within its own pool so the
@@ -3607,19 +3701,20 @@ function generateSettembreCalendar() {
       windows.push(...getShowerRangesForCandidateOnDay(aspiranteMatch.id, day));
     }
     (newCalendar.weekly[day] || []).forEach(taskInst => {
-      const taskWindows = SETTEMBRE_TASK_TIME_WINDOWS[taskInst.name.trim().toLowerCase()];
-      if (taskWindows && taskInst.assigned.includes(name)) {
+      const task = state.settembreTasks.find(t => t.id === taskInst.taskId);
+      const taskWindows = task ? getTaskTimeWindows(task) : [];
+      if (taskWindows.length > 0 && taskInst.assigned.includes(name)) {
         windows.push(...taskWindows);
       }
     });
-    [newCalendar.houseCleaning, newCalendar.esterniCleaning].forEach(cleaningMap => {
-      Object.values(cleaningMap).forEach(data => {
-        const isPrimary = (data.assigned || []).includes(name);
-        const isHelperToday = (data.helpers || []).some(h => h.name === name && h.days.includes(day.slice(0, 3)));
-        if (isPrimary || isHelperToday) {
-          windows.push(ZONE_CLEANING_TIME_WINDOW);
-        }
-      });
+    // "Pulizia Esterni" has no time window (organizational choice) - only
+    // "Pulizia Casa" counts as an occupied window here.
+    Object.values(newCalendar.houseCleaning).forEach(data => {
+      const isPrimary = (data.assigned || []).includes(name);
+      const isHelperToday = (data.helpers || []).some(h => h.name === name && h.days.includes(day.slice(0, 3)));
+      if (isPrimary || isHelperToday) {
+        windows.push(ZONE_CLEANING_TIME_WINDOW);
+      }
     });
     return windows;
   }

@@ -493,6 +493,8 @@ function init() {
   // SETTEMBRE: Gestione Aspiranti
   document.getElementById("save-settembre-aspiranti-btn").addEventListener("click", saveSettembreAspiranti);
   document.getElementById("save-settembre-shower-schedule-btn").addEventListener("click", saveSettembreShowerSchedule);
+  document.getElementById("close-shower-schedule-remove-btn").addEventListener("click", () => closeModal(document.getElementById("modal-shower-schedule-remove")));
+  document.getElementById("confirm-shower-schedule-remove-btn").addEventListener("click", confirmShowerScheduleRemove);
   document.getElementById("save-settembre-shower-times-btn").addEventListener("click", saveSettembreShowerTimes);
 
   // SETTEMBRE: Mansioni Modal Buttons
@@ -1663,6 +1665,49 @@ function addSlotToShowerScheduleField(inputId, slotCode) {
   if (picker) picker.value = "";
 }
 
+// Opens a popup listing the people currently in a shower-schedule cell by
+// NAME (unlike the text field itself, which shows slot codes) with a
+// checkbox each, so removing someone doesn't require knowing/typing their
+// slot code.
+let showerScheduleRemoveTargetInputId = null;
+
+function openShowerScheduleRemovePopup(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const codes = input.value.split(",").map(s => s.trim()).filter(Boolean);
+  if (codes.length === 0) {
+    alert("Questa casella è vuota.");
+    return;
+  }
+  showerScheduleRemoveTargetInputId = inputId;
+  const list = document.getElementById("shower-schedule-remove-list");
+  list.innerHTML = codes.map(code => {
+    const a = state.settembreAspiranti.find(x => x.slot.toLowerCase() === code.toLowerCase());
+    const label = a ? a.name : code;
+    return `<label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
+      <input type="checkbox" class="shower-remove-checkbox" value="${escapeHtml(code)}" style="width: 17px; height: 17px; accent-color: var(--accent-color); cursor: pointer;">
+      ${escapeHtml(label)}
+    </label>`;
+  }).join('');
+  openModal(document.getElementById("modal-shower-schedule-remove"));
+}
+
+function confirmShowerScheduleRemove() {
+  const modal = document.getElementById("modal-shower-schedule-remove");
+  if (!showerScheduleRemoveTargetInputId) {
+    closeModal(modal);
+    return;
+  }
+  const input = document.getElementById(showerScheduleRemoveTargetInputId);
+  const toRemove = [...document.querySelectorAll(".shower-remove-checkbox:checked")].map(cb => cb.value.toLowerCase());
+  if (input && toRemove.length > 0) {
+    const current = input.value.split(",").map(s => s.trim()).filter(Boolean);
+    input.value = current.filter(code => !toRemove.includes(code.toLowerCase())).join(", ");
+  }
+  showerScheduleRemoveTargetInputId = null;
+  closeModal(modal);
+}
+
 function populateSettembreShowerScheduleForm() {
   const schedule = getShowerSchedule();
   ["mattina", "pomeriggio", "sera"].forEach(shift => {
@@ -1676,7 +1721,10 @@ function populateSettembreShowerScheduleForm() {
       });
       const inputId = `settembre-shower-schedule-${shift}-${day}`;
       cell.innerHTML = `<input type="text" id="${inputId}" class="input-field" style="padding: 6px 8px; font-size: 12px; width: 110px;" value="${escapeHtml(slotLabels.join(', '))}">
-        ${showerSlotPickerHTML(inputId)}`;
+        <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px;">
+          ${showerSlotPickerHTML(inputId)}
+          <button type="button" class="btn btn-secondary" style="width: auto; padding: 4px 8px; font-size: 11px;" onclick="openShowerScheduleRemovePopup('${inputId}')">Rimuovi</button>
+        </div>`;
     });
   });
 }

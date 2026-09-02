@@ -11,6 +11,7 @@ let state = {
   settembreHouseParts: [],
   settembreEsterniParts: [],
   settembreShowerTimes: null,
+  settembreShowerSchedule: null,
   settembreCalendar: null,
   isSettembreUnlocked: false
 };
@@ -29,18 +30,18 @@ let editingSettembreEsterniPartId = null;
 const DAYS_OF_WEEK = ["venerdì", "sabato", "domenica", "lunedì", "martedì", "mercoledì", "giovedì"];
 const WIZARD_DAYS = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"];
 
-// SETTEMBRE: fixed weekly shower-shift grid (never changes - only the names
-// behind each slot, in state.settembreAspiranti, and the times, in
-// state.settembreShowerTimes, are editable). Uses the same Lun->Dom order
-// as WIZARD_DAYS.
+// SETTEMBRE: weekly shower-shift grid. The table structure (3 turni x 7
+// giorni) is fixed, but both who's assigned to each cell
+// (state.settembreShowerSchedule) and the shift times
+// (state.settembreShowerTimes) are admin-editable. DEFAULT_SHOWER_SCHEDULE
+// below is only the initial seed (4 uomini + 1 donna per turno, riempiti
+// progressivamente da U1/F1 in avanti) - once edited, it's whatever the
+// admin set. Uses the same Lun->Dom order as WIZARD_DAYS.
 const DEFAULT_SHOWER_TIMES = { mattina: { start: "07:05", end: "07:30" }, pomeriggio: { start: "13:30", end: "13:55" }, sera: { start: "18:35", end: "19:00" } };
 function getShowerTimes() {
   return state.settembreShowerTimes || DEFAULT_SHOWER_TIMES;
 }
-// 4 uomini (U) + 1 donna (F) per turno, riempiti progressivamente da U1/F1
-// in avanti (con "giro" quando si supera U13/F3) seguendo l'ordine
-// mattina->pomeriggio->sera, lunedì->domenica.
-const SHOWER_SCHEDULE = {
+const DEFAULT_SHOWER_SCHEDULE = {
   mattina: {
     lunedì: ["u1", "u2", "u3", "u4", "f1"], martedì: ["u5", "u6", "u7", "u8", "f2"], mercoledì: ["u9", "u10", "u11", "u12", "f3"],
     giovedì: ["u13", "u1", "u2", "u3", "f1"], venerdì: ["u4", "u5", "u6", "u7", "f2"], sabato: ["u8", "u9", "u10", "u11", "f3"], domenica: ["u12", "u13", "u1", "u2", "f1"]
@@ -54,6 +55,9 @@ const SHOWER_SCHEDULE = {
     giovedì: ["u4", "u5", "u6", "u7", "f3"], venerdì: ["u8", "u9", "u10", "u11", "f1"], sabato: ["u12", "u13", "u1", "u2", "f2"], domenica: ["u3", "u4", "u5", "u6", "f3"]
   }
 };
+function getShowerSchedule() {
+  return state.settembreShowerSchedule || DEFAULT_SHOWER_SCHEDULE;
+}
 
 // SETTEMBRE: internal-only time windows (never shown anywhere in the UI,
 // unlike the shower times, which ARE shown) used purely so the generator doesn't assign someone
@@ -95,11 +99,12 @@ function timeRangesOverlap(startA, endA, startB, endB) {
 }
 
 // Which shower time range(s), if any, a given aspirante slot id (e.g. "u1")
-// falls into on a given day, per the fixed SHOWER_SCHEDULE.
+// falls into on a given day, per the current shower schedule.
 function getShowerRangesForCandidateOnDay(candidateId, day) {
   const ranges = [];
+  const schedule = getShowerSchedule();
   ["mattina", "pomeriggio", "sera"].forEach(shift => {
-    const slots = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
+    const slots = (schedule[shift] && schedule[shift][day]) || [];
     if (slots.includes(candidateId)) {
       const { start, end } = getShowerTimes()[shift];
       ranges.push({ start, end });
@@ -327,6 +332,10 @@ function refreshLiveUI() {
   if (!document.activeElement || !document.activeElement.closest("#settembre-aspiranti-table-body")) {
     populateSettembreAspirantiTable();
   }
+  // Same polling-clobber guard as above, for the shower-schedule table.
+  if (!document.activeElement || !document.activeElement.closest("#settembre-shower-schedule-body")) {
+    populateSettembreShowerScheduleForm();
+  }
   // Same polling-clobber guard as above, for the shower-times form.
   if (!document.activeElement || !document.activeElement.closest("#settembre-shower-times-form")) {
     populateSettembreShowerTimesForm();
@@ -386,6 +395,7 @@ function applyServerState(data) {
   }));
   state.settembreCalendar = data.settembreCalendar || null;
   state.settembreShowerTimes = data.settembreShowerTimes || DEFAULT_SHOWER_TIMES;
+  state.settembreShowerSchedule = data.settembreShowerSchedule || DEFAULT_SHOWER_SCHEDULE;
 }
 
 async function pollServerState() {
@@ -482,6 +492,7 @@ function init() {
 
   // SETTEMBRE: Gestione Aspiranti
   document.getElementById("save-settembre-aspiranti-btn").addEventListener("click", saveSettembreAspiranti);
+  document.getElementById("save-settembre-shower-schedule-btn").addEventListener("click", saveSettembreShowerSchedule);
   document.getElementById("save-settembre-shower-times-btn").addEventListener("click", saveSettembreShowerTimes);
 
   // SETTEMBRE: Mansioni Modal Buttons
@@ -585,6 +596,7 @@ function showApp() {
   populateSearchPersonDropdown();
   populateSettembreSearchPersonDropdown();
   populateSettembreAspirantiTable();
+  populateSettembreShowerScheduleForm();
   populateSettembreShowerTimesForm();
   populateSettembreTasksTable();
   updateSettembreLinkedTasksDropdown();
@@ -1543,9 +1555,10 @@ function renderShowerTable() {
     }
   });
 
+  const schedule = getShowerSchedule();
   WIZARD_DAYS.forEach(day => {
     ["mattina", "pomeriggio", "sera"].forEach(shift => {
-      const slotIds = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
+      const slotIds = (schedule[shift] && schedule[shift][day]) || [];
       const names = slotIds.map(slotId => {
         const aspirante = state.settembreAspiranti.find(a => a.id === slotId);
         return aspirante ? aspirante.name : slotId;
@@ -1586,9 +1599,8 @@ function saveSettembreAspiranti() {
   alert("Nomi aspiranti salvati!");
 }
 
-// SETTEMBRE: admin-only editing of the 3 fixed shower-shift times. The
-// shift grid (who showers when) never changes - only these start/end times
-// do, and they also drive the internal conflict-avoidance checks against
+// SETTEMBRE: admin-only editing of the 3 fixed shower-shift times. These
+// start/end times also drive the internal conflict-avoidance checks against
 // cooking/laundry/cleaning windows.
 function populateSettembreShowerTimesForm() {
   const times = getShowerTimes();
@@ -1621,6 +1633,84 @@ function saveSettembreShowerTimes() {
   persistState("settembreShowerTimes", newTimes);
   renderShowerTable();
   alert("Orari docce salvati!");
+}
+
+// SETTEMBRE: admin-only editing of WHO is assigned to each shift/day cell
+// of the shower schedule. Each cell holds a free-text, comma-separated list
+// of slot codes (e.g. "U1, U2, U3, U4, F1") resolved against the fixed
+// slot codes in state.settembreAspiranti (not names, so a slot keeps its
+// assignment even if the aspirante behind it gets renamed later) - same
+// free-text + picker pattern as assigneePickerHTML/addNameToAssigneeField.
+function showerSlotPickerHTML(inputId) {
+  return `<select id="${inputId}-picker" class="input-field" style="margin-top: 4px; padding: 4px 6px; font-size: 11px;" onchange="addSlotToShowerScheduleField('${inputId}', this.value)">
+    <option value="">+ Aggiungi...</option>
+    ${state.settembreAspiranti.map(a => `<option value="${escapeHtml(a.slot)}">${escapeHtml(a.slot)} (${escapeHtml(a.name)})</option>`).join('')}
+  </select>`;
+}
+
+function addSlotToShowerScheduleField(inputId, slotCode) {
+  if (!slotCode) return;
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const current = input.value.split(",").map(s => s.trim()).filter(Boolean);
+  if (!current.includes(slotCode)) {
+    current.push(slotCode);
+  }
+  input.value = current.join(", ");
+
+  const picker = document.getElementById(inputId + "-picker");
+  if (picker) picker.value = "";
+}
+
+function populateSettembreShowerScheduleForm() {
+  const schedule = getShowerSchedule();
+  ["mattina", "pomeriggio", "sera"].forEach(shift => {
+    WIZARD_DAYS.forEach(day => {
+      const cell = document.querySelector(`#settembre-shower-schedule-body tr[data-shift="${shift}"] td[data-day="${day}"]`);
+      if (!cell) return;
+      const slotIds = (schedule[shift] && schedule[shift][day]) || [];
+      const slotLabels = slotIds.map(id => {
+        const a = state.settembreAspiranti.find(x => x.id === id);
+        return a ? a.slot : id;
+      });
+      const inputId = `settembre-shower-schedule-${shift}-${day}`;
+      cell.innerHTML = `<input type="text" id="${inputId}" class="input-field" style="padding: 6px 8px; font-size: 12px; width: 110px;" value="${escapeHtml(slotLabels.join(', '))}">
+        ${showerSlotPickerHTML(inputId)}`;
+    });
+  });
+}
+
+function saveSettembreShowerSchedule() {
+  const newSchedule = { mattina: {}, pomeriggio: {}, sera: {} };
+  const unrecognized = new Set();
+
+  ["mattina", "pomeriggio", "sera"].forEach(shift => {
+    WIZARD_DAYS.forEach(day => {
+      const input = document.getElementById(`settembre-shower-schedule-${shift}-${day}`);
+      const tokens = input ? input.value.split(",").map(s => s.trim()).filter(Boolean) : [];
+      const ids = [];
+      tokens.forEach(tok => {
+        const match = state.settembreAspiranti.find(a => a.slot.toLowerCase() === tok.toLowerCase());
+        if (match) {
+          if (!ids.includes(match.id)) ids.push(match.id);
+        } else {
+          unrecognized.add(tok);
+        }
+      });
+      newSchedule[shift][day] = ids;
+    });
+  });
+
+  state.settembreShowerSchedule = newSchedule;
+  persistState("settembreShowerSchedule", newSchedule);
+  renderShowerTable();
+
+  if (unrecognized.size > 0) {
+    alert(`Turni docce salvati, ma questi codici slot non sono stati riconosciuti e sono stati ignorati: ${[...unrecognized].join(', ')}. Usa i codici esatti (es. U1, F2).`);
+  } else {
+    alert("Turni docce salvati!");
+  }
 }
 
 function toggleLock() {
@@ -2406,10 +2496,11 @@ function runSettembreTodaySearch() {
       });
     });
 
-    // Fixed shower schedule - not part of settembreCalendar, resolved from
-    // SHOWER_SCHEDULE + state.settembreAspiranti like renderShowerTable().
+    // Shower schedule - not part of settembreCalendar, resolved from
+    // getShowerSchedule() + state.settembreAspiranti like renderShowerTable().
+    const showerSchedule = getShowerSchedule();
     ["mattina", "pomeriggio", "sera"].forEach(shift => {
-      const slotIds = (SHOWER_SCHEDULE[shift] && SHOWER_SCHEDULE[shift][day]) || [];
+      const slotIds = (showerSchedule[shift] && showerSchedule[shift][day]) || [];
       slotIds.forEach(slotId => {
         const aspirante = state.settembreAspiranti.find(a => a.id === slotId);
         if (aspirante && nameMatches(aspirante.name)) {

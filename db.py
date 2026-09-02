@@ -85,6 +85,27 @@ DEFAULT_SETTEMBRE_SHOWER_TIMES = {
     "sera": {"start": "18:35", "end": "19:00"},
 }
 
+# Editable roster grid for the shower shifts: which of the 16 fixed slot
+# ids (u1..u13, f1..f3) shower during each shift/day cell. This is only the
+# initial seed (4 uomini + 1 donna per turno, riempiti progressivamente da
+# U1/F1 in avanti) - once an admin edits it via the Turni Docce panel, it's
+# whatever they set. Stored by slot id (not name) so a slot keeps its
+# assignment even if the aspirante behind it gets renamed later.
+DEFAULT_SETTEMBRE_SHOWER_SCHEDULE = {
+    "mattina": {
+        "lunedì": ["u1", "u2", "u3", "u4", "f1"], "martedì": ["u5", "u6", "u7", "u8", "f2"], "mercoledì": ["u9", "u10", "u11", "u12", "f3"],
+        "giovedì": ["u13", "u1", "u2", "u3", "f1"], "venerdì": ["u4", "u5", "u6", "u7", "f2"], "sabato": ["u8", "u9", "u10", "u11", "f3"], "domenica": ["u12", "u13", "u1", "u2", "f1"],
+    },
+    "pomeriggio": {
+        "lunedì": ["u3", "u4", "u5", "u6", "f2"], "martedì": ["u7", "u8", "u9", "u10", "f3"], "mercoledì": ["u11", "u12", "u13", "u1", "f1"],
+        "giovedì": ["u2", "u3", "u4", "u5", "f2"], "venerdì": ["u6", "u7", "u8", "u9", "f3"], "sabato": ["u10", "u11", "u12", "u13", "f1"], "domenica": ["u1", "u2", "u3", "u4", "f2"],
+    },
+    "sera": {
+        "lunedì": ["u5", "u6", "u7", "u8", "f3"], "martedì": ["u9", "u10", "u11", "u12", "f1"], "mercoledì": ["u13", "u1", "u2", "u3", "f2"],
+        "giovedì": ["u4", "u5", "u6", "u7", "f3"], "venerdì": ["u8", "u9", "u10", "u11", "f1"], "sabato": ["u12", "u13", "u1", "u2", "f2"], "domenica": ["u3", "u4", "u5", "u6", "f3"],
+    },
+}
+
 DEFAULTS = {
     "people": DEFAULT_PEOPLE,
     "tasks": DEFAULT_TASKS,
@@ -94,6 +115,7 @@ DEFAULTS = {
     "settembreHouseParts": DEFAULT_SETTEMBRE_HOUSE_PARTS,
     "settembreEsterniParts": DEFAULT_SETTEMBRE_ESTERNI_PARTS,
     "settembreShowerTimes": DEFAULT_SETTEMBRE_SHOWER_TIMES,
+    "settembreShowerSchedule": DEFAULT_SETTEMBRE_SHOWER_SCHEDULE,
 }
 
 VALID_KEYS = {
@@ -107,6 +129,7 @@ VALID_KEYS = {
     "settembreEsterniParts",
     "settembreCalendar",
     "settembreShowerTimes",
+    "settembreShowerSchedule",
 }
 
 
@@ -186,6 +209,7 @@ def get_all_state():
         "settembreEsterniParts": data.get("settembreEsterniParts", []),
         "settembreCalendar": data.get("settembreCalendar"),
         "settembreShowerTimes": data.get("settembreShowerTimes", DEFAULT_SETTEMBRE_SHOWER_TIMES),
+        "settembreShowerSchedule": data.get("settembreShowerSchedule", DEFAULT_SETTEMBRE_SHOWER_SCHEDULE),
     }
 
 

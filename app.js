@@ -215,6 +215,7 @@ const calendarFullView = document.getElementById("calendar-full-view");
 
 // "Cosa faccio oggi?" search (SETTEMBRE)
 const settembreSearchPersonInput = document.getElementById("settembre-search-person-input");
+const settembreSearchTaskInput = document.getElementById("settembre-search-task-input");
 const settembreSearchDayInput = document.getElementById("settembre-search-day-input");
 const settembreSearchTodayResults = document.getElementById("settembre-search-today-results");
 const settembreCalendarFullView = document.getElementById("settembre-calendar-full-view");
@@ -323,6 +324,7 @@ function refreshLiveUI() {
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
   populateSettembreSearchPersonDropdown();
+  populateSettembreSearchTaskDropdown();
   // Gestione Aspiranti has no lock/unlock like the calendars - its name
   // inputs are always live-editable - so the same polling-clobber problem
   // applies here too: rebuilding the table mid-edit would wipe out
@@ -479,6 +481,7 @@ function init() {
   searchPersonInput.addEventListener("change", runTodaySearch);
   searchDayInput.addEventListener("change", runTodaySearch);
   settembreSearchPersonInput.addEventListener("change", runSettembreTodaySearch);
+  settembreSearchTaskInput.addEventListener("change", runSettembreTodaySearch);
   settembreSearchDayInput.addEventListener("change", runSettembreTodaySearch);
 
   // Wizard Buttons
@@ -598,6 +601,7 @@ function showApp() {
   updateLinkedTasksDropdowns();
   populateSearchPersonDropdown();
   populateSettembreSearchPersonDropdown();
+  populateSettembreSearchTaskDropdown();
   populateSettembreAspirantiTable();
   populateSettembreShowerScheduleForm();
   populateSettembreShowerTimesForm();
@@ -699,6 +703,21 @@ function populateSettembreSearchPersonDropdown() {
   // Keep the current selection if that person still exists
   if ([...settembreSearchPersonInput.options].some(o => o.value === previousValue)) {
     settembreSearchPersonInput.value = previousValue;
+  }
+}
+
+function populateSettembreSearchTaskDropdown() {
+  const previousValue = settembreSearchTaskInput.value;
+  settembreSearchTaskInput.innerHTML = '<option value="">Tutte le mansioni</option>';
+  [...state.settembreTasks].sort((a, b) => a.priority - b.priority).forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.name;
+    settembreSearchTaskInput.appendChild(opt);
+  });
+  // Keep the current selection if that task still exists
+  if ([...settembreSearchTaskInput.options].some(o => o.value === previousValue)) {
+    settembreSearchTaskInput.value = previousValue;
   }
 }
 
@@ -2504,13 +2523,61 @@ function runTodaySearch() {
 // (WIZARD_DAYS lun->dom order, eveningCheck split into supervisore/aspirante,
 // esterniCleaning zones, lavatrici turni, and the fixed shower schedule -
 // none of which exist on the main scheda).
+// "Cosa faccio oggi?" mansione search (SETTEMBRE) - given a settembreTasks
+// id, lists who's assigned to it each day (filtered by dayQuery, if set).
+// Independent of the person filter, per user request ("incrocia i
+// risultati solo con la barra di ricerca giorno").
+function runSettembreTaskSearch(taskId, dayQuery) {
+  settembreCalendarFullView.style.display = "none";
+
+  const task = state.settembreTasks.find(t => t.id === taskId);
+  if (!task) {
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Mansione non trovata.</p>`;
+    return;
+  }
+  if (!state.settembreCalendar) {
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessun calendario generato.</p>`;
+    return;
+  }
+
+  const dayMatches = (day) => !dayQuery || day.toLowerCase().startsWith(dayQuery);
+  const results = []; // { day, names }
+
+  WIZARD_DAYS.forEach(day => {
+    if (!dayMatches(day)) return;
+    (state.settembreCalendar.weekly[day] || []).forEach(taskInst => {
+      if (taskInst.taskId === taskId && taskInst.assigned && taskInst.assigned.length > 0) {
+        results.push({ day, names: taskInst.assigned });
+      }
+    });
+  });
+
+  if (results.length === 0) {
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Nessuna assegnazione trovata per "${escapeHtml(task.name)}" con i criteri inseriti.</p>`;
+    return;
+  }
+
+  let html = `<div class="search-today-section-title">${escapeHtml(task.name)}</div>`;
+  html += `<ul class="desc-list">${results.map(r => `<li><strong>${escapeHtml(r.day)}</strong>: ${escapeHtml(r.names.join(', '))}</li>`).join('')}</ul>`;
+  settembreSearchTodayResults.innerHTML = html;
+}
+
 function runSettembreTodaySearch() {
   const personQuery = settembreSearchPersonInput.value.trim().toLowerCase();
+  const taskId = settembreSearchTaskInput.value;
   const dayQuery = settembreSearchDayInput.value.trim().toLowerCase();
+
+  // Mansione search is a separate criterion from the person search - it
+  // only crosses with the day filter (never with the person dropdown) -
+  // so it's checked first and, when active, takes over the results area.
+  if (taskId) {
+    runSettembreTaskSearch(taskId, dayQuery);
+    return;
+  }
 
   if (!personQuery) {
     settembreCalendarFullView.style.display = "";
-    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Seleziona una persona per vedere le sue attività.</p>`;
+    settembreSearchTodayResults.innerHTML = `<p style="color: var(--text-muted); font-size: 14px;">Seleziona una persona per vedere le sue attività, oppure una mansione per vedere chi è assegnato.</p>`;
     return;
   }
 
@@ -3262,13 +3329,17 @@ function generateSettembreCalendar() {
     activeCandidates.forEach(c => { taskAssignmentCounts[t.id][c.id] = 0; });
   });
 
-  // "Aiuto Cucina" convention: whoever ends up first in the assigned list
-  // rinses the dishes, whoever is second dries them - never shown anywhere,
-  // just an ordering the two already know. Track a running balance so the
-  // same person doesn't always land first across the days this recurs.
-  const kitchenHelpRinseCounts = {};
+  // "Aiuto Cucina" (2 persone): la prima nell'ordine lava i piatti, la
+  // seconda li asciuga. Se "Aiuto Cucina" ha mansioni collegate (es.
+  // "Lavaggio Piatti"/"Asciugatura Piatti", stesso target, in
+  // quest'ordine di priorità), questo ordine determina anche a chi tocca
+  // quale mansione collegata (vedi parentPoolPointer sotto) - non è più
+  // solo una convenzione invisibile. Si tiene un bilancio per non far
+  // ricadere sempre sulla stessa persona lo stesso ruolo nei giorni in cui
+  // la mansione ricorre.
+  const kitchenHelpWashCounts = {};
   const kitchenHelpDryCounts = {};
-  activeCandidates.forEach(c => { kitchenHelpRinseCounts[c.id] = 0; kitchenHelpDryCounts[c.id] = 0; });
+  activeCandidates.forEach(c => { kitchenHelpWashCounts[c.id] = 0; kitchenHelpDryCounts[c.id] = 0; });
 
   WIZARD_DAYS.forEach(day => {
     newCalendar.weekly[day] = [];
@@ -3330,10 +3401,10 @@ function generateSettembreCalendar() {
       let orderedAssignedCandidates = assignedCandidates;
       if (assignedCandidates.length === 2 && task.name.trim().toLowerCase() === "aiuto cucina") {
         const [a, b] = assignedCandidates;
-        const aBias = kitchenHelpRinseCounts[a.id] - kitchenHelpDryCounts[a.id];
-        const bBias = kitchenHelpRinseCounts[b.id] - kitchenHelpDryCounts[b.id];
+        const aBias = kitchenHelpWashCounts[a.id] - kitchenHelpDryCounts[a.id];
+        const bBias = kitchenHelpWashCounts[b.id] - kitchenHelpDryCounts[b.id];
         orderedAssignedCandidates = aBias <= bBias ? [a, b] : [b, a];
-        kitchenHelpRinseCounts[orderedAssignedCandidates[0].id]++;
+        kitchenHelpWashCounts[orderedAssignedCandidates[0].id]++;
         kitchenHelpDryCounts[orderedAssignedCandidates[1].id]++;
       }
 
@@ -3343,16 +3414,18 @@ function generateSettembreCalendar() {
         assigned: orderedAssignedCandidates.map(c => c.name)
       });
 
-      // Linked child tasks reuse the parent's assignees only when they share
-      // the same target pool (otherwise there's nobody eligible to reuse);
-      // otherwise - or when the parent's group runs out - top up from the
-      // child's own eligible pool.
+      // Linked child tasks reuse the parent's assignees (in the same order
+      // used above - so e.g. "Aiuto Cucina"'s wash/dry bias order decides
+      // who gets which linked child, not an arbitrary one) only when they
+      // share the same target pool (otherwise there's nobody eligible to
+      // reuse); otherwise - or when the parent's group runs out - top up
+      // from the child's own eligible pool.
       let parentPoolPointer = 0;
       linkedChildrenForMinP.forEach(child => {
         const childEligiblePool = dailyRosterAll.filter(c => candidateMatchesTarget(c, child.target));
         let childAssigned = [];
         if (child.target === task.target) {
-          childAssigned = assignedCandidates.slice(parentPoolPointer, parentPoolPointer + child.minPeople);
+          childAssigned = orderedAssignedCandidates.slice(parentPoolPointer, parentPoolPointer + child.minPeople);
           parentPoolPointer += childAssigned.length;
         }
 
